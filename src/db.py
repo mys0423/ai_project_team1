@@ -75,16 +75,16 @@ def list_task(keyword=''):
             return cur.fetchall()
 
 # 수정
-def update_voice_data(data_id, transcript, language):
-    sql = load_sql('update_voice_data.sql')
-    with get_connection() as conn:
-        with conn.cursor() as cur:
-            cur.execute(sql, (transcript, language, data_id))
-            return cur.rowcount
+# def update_voice_data(data_id, transcript, language):
+#     sql = load_sql('update_voice_data.sql')
+#     with get_connection() as conn:
+#         with conn.cursor() as cur:
+#             cur.execute(sql, (transcript, language, data_id))
+#             return cur.rowcount
 
 # 삭제
-def delete_voice_data(data_id):
-    sql = load_sql('delete_voice_data.sql')
+def delete_data(data_id):
+    sql = load_sql('delete_data.sql')
     with get_connection() as conn:
         with conn.cursor() as cur:
             cur.execute(sql, (data_id,))
