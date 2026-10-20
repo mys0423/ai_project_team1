@@ -12,7 +12,8 @@ CREATE TABLE IF NOT EXISTS tasks ( -- content 넣어야되고
     content TEXT NOT NULL,
     due_date DATE,
     completed BOOLEAN NOT NULL DEFAULT FALSE, -- 이게 is_done 이고
-    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE TABLE IF NOT EXISTS voice_runs ( -- error_message 빠져있고
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

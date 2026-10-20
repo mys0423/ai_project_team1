@@ -18,8 +18,7 @@ def load_sql(filename):
         raise ValueError('sql폴더의 .sql파일명만 지정하세요')
     return path.read_text(encoding='utf-8')
 
-# load_dotenv()
-
+load_dotenv()
 
 DATABASE_URL = os.getenv("DATABASE_URL")
 
@@ -46,12 +45,12 @@ def add_memo(content):
             cur.execute(sql, (content,))
             return cur.fetchone()[0]
 
-# 메모 입력
-def add_task(content):
+# 할 일 생성
+def add_task(title, content, due_date=None):
     sql = load_sql('add_task.sql')
     with get_connection() as conn:
         with conn.cursor() as cur:
-            cur.execute(sql, (content,))
+            cur.execute(sql, (title, content, due_date,))
             return cur.fetchone()[0]
 
 # 최근 메모 조회
@@ -65,32 +64,37 @@ def list_memo():
 
 
 # 날짜별 조회
-def list_task(keyword=''):
+def list_task(due_date):
     sql = load_sql('list_task.sql')
-    params = (f'%{keyword.strip()}%',) # %는 0개 이상의 문자열
     with get_connection() as conn:
         # row_factory=dict_row : 행들을 딕셔너리로 가져옴
         with conn.cursor(row_factory=dict_row) as cur:
-            cur.execute(sql, params)
+            cur.execute(sql, (due_date,))
             return cur.fetchall()
 
 # 수정
-# def update_voice_data(data_id, transcript, language):
-#     sql = load_sql('update_voice_data.sql')
-#     with get_connection() as conn:
-#         with conn.cursor() as cur:
-#             cur.execute(sql, (transcript, language, data_id))
-#             return cur.rowcount
+def update_data(data_id, due_date, content, completed):
+    sql = load_sql('update_data.sql')
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(sql, (due_date, content, completed, data_id))
+            return cur.rowcount
 
-# 삭제
-def delete_data(data_id):
-    sql = load_sql('delete_data.sql')
+# 메모 삭제
+def delete_memo(data_id):
+    sql = load_sql('delete_memo.sql')
     with get_connection() as conn:
         with conn.cursor() as cur:
             cur.execute(sql, (data_id,))
             return cur.rowcount
 
-
+# task 삭제
+def delete_task(data_id):
+    sql = load_sql('delete_task.sql')
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(sql, (data_id,))
+            return cur.rowcount
 
 
 
