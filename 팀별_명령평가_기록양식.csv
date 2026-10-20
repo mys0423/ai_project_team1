@@ -1,2 +1,0 @@
-﻿case_id,audio_id,reference_text,stt_transcript,true_intent,predicted_intent,slot_expected,slot_predicted,stt_latency_ms,intent_latency_ms,pass_fail,error_note
-A-T01,,,,,,,,,,,

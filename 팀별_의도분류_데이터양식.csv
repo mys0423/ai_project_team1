@@ -1,6 +1,0 @@
-﻿sample_id,text,intent,split,source,speaker_or_session,notes
-A001,메모에 회의 준비라고 적어 줘,ADD_MEMO,train,직접 작성,,예시
-A002,저장한 메모를 보여 줘,LIST_MEMO,train,직접 작성,,예시
-A003,내일 할 일에 발표 추가해 줘,ADD_TASK,train,직접 작성,,예시
-A004,오늘 할 일 알려 줘,LIST_TASK,train,직접 작성,,예시
-A005,사용법을 알려 줘,HELP,train,직접 작성,,예시
