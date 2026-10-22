@@ -1,0 +1,3 @@
+DELETE FROM task
+WHERE id = %s
+RETURNING id;

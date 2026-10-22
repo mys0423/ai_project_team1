@@ -7,5 +7,6 @@ INSERT INTO voice_runs (
     latency_ms,
     error_message
 )
-VALUES (%s, %s, %s, %s, %s, %s)
-RETURNING id;
+FROM voice_runs
+ORDER BY created_at DESC
+LIMIT %s;

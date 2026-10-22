@@ -1,3 +1,6 @@
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
+
 -- 1. 메모 저장
 CREATE TABLE IF NOT EXISTS memos (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -20,7 +23,10 @@ CREATE TABLE IF NOT EXISTS tasks (
 CREATE TABLE IF NOT EXISTS voice_runs(
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    transcript TEXT,
     intent TEXT,
+    status TEXT NOT NULL,
+    response_text TEXT,
     latency_ms DOUBLE PRECISION,
     error_message TEXT
 );
