@@ -1,4 +1,15 @@
 # stt.py
+'''
+여기서 audio1.py 불러오고
+faster-whisper 실행
+음성 파일 전사 처리
+전사 처리된 text 반환
+'''
+
+from src.audio1 import *
+from faster_whisper import WhisperModel
+
+
 
 
 

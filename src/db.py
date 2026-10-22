@@ -1,5 +1,11 @@
 # db.py
 # 프로젝트 DB
+'''
+database_url 검사
+sql 불러오고
+테이블 생성, 수정, 조회 및 삭제
+'''
+
 
 import os
 import psycopg

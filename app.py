@@ -3,7 +3,7 @@
 import pandas as pd
 import streamlit as st
 
-from src.audio import *
+from src.audio1 import *
 from src.db import *
 
 st.set_page_config('테스트')
@@ -18,7 +18,7 @@ def main():
     try:
         create_table()
         with st.form('memo'):
-            memo = st.text_input('메모 음성 파일')
+            memo = st.file_uploader('메모 음성 파일', type=['wav'])
             submitted = st.form_submit_button('메모 저장')
         if submitted:
             if not memo:
@@ -27,9 +27,9 @@ def main():
                 add_memo(memo)
 
         with st.form('task'):
-            task = st.file_uploader('할 일 음성 파일')
-            submitted1 = st.form_submit_button('할일 저장')
-        if submitted1:
+            task = st.file_uploader('할 일 음성 파일', type=['wav'])
+            submitted = st.form_submit_button('할일 저장')
+        if submitted:
             if not task:
                 st.warning('음성파일을 올려주세요')
             else:
