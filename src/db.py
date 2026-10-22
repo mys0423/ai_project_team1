@@ -3,10 +3,15 @@
 
 import os
 import psycopg
-from psycopg.rows import dict_row # 조회한 행들을 딕셔너리로 가져오는 함수
-from dotenv import load_dotenv # .env 로딩 라이브러리
+from psycopg.rows import dict_row
+from dotenv import load_dotenv
 from pathlib import Path
 
+load_dotenv()
+
+DATABASE_URL = os.getenv("DATABASE_URL")
+
+# sql폴더
 SQL_DIR = Path(__file__).resolve().parent.parent / 'sql'
 if not SQL_DIR.exists():
     SQL_DIR.mkdir(parents=True, exist_ok=True)
@@ -17,10 +22,6 @@ def load_sql(filename):
     if path.parent != SQL_DIR.resolve() or path.suffix != '.sql':
         raise ValueError('sql폴더의 .sql파일명만 지정하세요')
     return path.read_text(encoding='utf-8')
-
-load_dotenv()
-
-DATABASE_URL = os.getenv("DATABASE_URL")
 
 def has_database_url():
     return bool(DATABASE_URL)
@@ -57,17 +58,14 @@ def add_task(title, content, due_date=None):
 def list_memo():
     sql = load_sql('list_memo.sql')
     with get_connection() as conn:
-        # row_factory=dict_row : 행들을 딕셔너리로 가져옴
         with conn.cursor(row_factory=dict_row) as cur:
             cur.execute(sql)
             return cur.fetchall()
-
 
 # 날짜별 조회
 def list_task(due_date):
     sql = load_sql('list_task.sql')
     with get_connection() as conn:
-        # row_factory=dict_row : 행들을 딕셔너리로 가져옴
         with conn.cursor(row_factory=dict_row) as cur:
             cur.execute(sql, (due_date,))
             return cur.fetchall()
@@ -96,7 +94,20 @@ def delete_task(data_id):
             cur.execute(sql, (data_id,))
             return cur.rowcount
 
+# 음성 명령 처리 입력
+def add_voice_runs(transcript, intent, response_text, status, latency_ms):
+    sql = load_sql('add_voice_runs.sql')
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(sql, (transcript, intent, response_text, status, latency_ms))
+            return cur.fetchone()[0]
 
+def list_voice_runs():
+    sql = load_sql('list_voice_runs.sql')
+    with get_connection() as conn:
+        with conn.cursor(row_factory=dict_row) as cur:
+            cur.execute(sql)
+            return cur.fetchall()
 
 
 

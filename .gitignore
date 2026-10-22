@@ -1,2 +1,7 @@
 *.md
 *.csv
+.venv/
+venv/
+__pycache__/
+*.pyc
+.env
