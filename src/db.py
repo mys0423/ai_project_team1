@@ -62,6 +62,14 @@ def list_memo():
             cur.execute(sql)
             return cur.fetchall()
 
+# 전체 조회
+def list_all_task():
+    sql = load_sql('list_all_tasks.sql')
+    with get_connection() as conn:
+        with conn.cursor(row_factory=dict_row) as cur:
+            cur.execute(sql)
+            return cur.fetchall()
+
 # 날짜별 조회
 def list_task(due_date):
     sql = load_sql('list_task.sql')
