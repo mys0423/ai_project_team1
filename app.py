@@ -18,7 +18,8 @@ def main():
     try:
         create_table()
         with st.form('memo'):
-            memo = st.file_uploader('메모 음성 파일', type=['wav'])
+            # memo = st.file_uploader('메모 음성 파일', type=['wav'])
+            memo = st.text_input('메모 음성 파일')
             submitted = st.form_submit_button('메모 저장')
         if submitted:
             if not memo:
@@ -27,13 +28,21 @@ def main():
                 add_memo(memo)
 
         with st.form('task'):
-            task = st.file_uploader('할 일 음성 파일', type=['wav'])
+            # task = st.file_uploader('할 일 음성 파일', type=['wav'])
+            title = st.text_input('할 일 제목')
+            content = st.text_input('할 일 내용')
+            due_date = st.date_input('기간')
             submitted = st.form_submit_button('할일 저장')
+
         if submitted:
-            if not task:
+            if not title or not content:
                 st.warning('음성파일을 올려주세요')
             else:
-                add_task(task)
+                add_task(
+                    title = title.strip(),
+                    content = content.strip(),
+                    due_date = due_date,
+                )
 
         st.subheader('메모')
         rows = list_memo()
