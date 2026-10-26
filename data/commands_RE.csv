@@ -159,3 +159,23 @@ cmd_0157,DELETE_MEMO,지난주 금요일 쓴 메모 삭제해 주세요,"[{""slo
 cmd_0158,DELETE_MEMO,시험 메모 삭제해 줘,"[{""slot"": ""KEYWORD"", ""value"": ""시험"", ""start"": 0, ""end"": 2}]",delete_memo.sql,DELETE_MEMO_00
 cmd_0159,DELETE_MEMO,장보기 관련 메모 지워 줘,"[{""slot"": ""KEYWORD"", ""value"": ""장보기"", ""start"": 0, ""end"": 3}]",delete_memo.sql,DELETE_MEMO_01
 cmd_0160,DELETE_MEMO,과제 들어간 메모 다 지워 줘,"[{""slot"": ""KEYWORD"", ""value"": ""과제"", ""start"": 0, ""end"": 2}]",delete_memo.sql,DELETE_MEMO_02
+cmd_0161,HELP,사용할 수 있는 명령 알려 줘,[],,HELP_00
+cmd_0162,HELP,지원하는 명령을 알려 주세요,[],,HELP_00
+cmd_0163,HELP,어떤 명령을 사용할 수 있어?,[],,HELP_00
+cmd_0164,HELP,여기서 가능한 명령이 뭐야?,[],,HELP_00
+cmd_0165,HELP,사용 방법 알려 줘,[],,HELP_01
+cmd_0166,HELP,이 음성 비서는 어떻게 사용해?,[],,HELP_01
+cmd_0167,HELP,처음 사용하는데 사용법 설명해 주세요,[],,HELP_01
+cmd_0168,HELP,이 서비스 이용 방법을 안내해 줘,[],,HELP_01
+cmd_0169,HELP,메모를 추가하려면 어떻게 말해야 해?,[],,HELP_02
+cmd_0170,HELP,할 일을 등록하는 명령 예시 알려 줘,[],,HELP_02
+cmd_0171,HELP,저장된 메모는 어떻게 조회해?,[],,HELP_02
+cmd_0172,HELP,할 일을 삭제하려면 무슨 말을 해야 해?,[],,HELP_02
+cmd_0173,HELP,도움말 보여 줘,[],,HELP_03
+cmd_0174,HELP,도움말 읽어 주세요,[],,HELP_03
+cmd_0175,HELP,도움말을 확인하고 싶어,[],,HELP_03
+cmd_0176,HELP,도움말 좀 안내해 줘,[],,HELP_03
+cmd_0177,HELP,메모 기능으로 무엇을 할 수 있어?,[],,HELP_04
+cmd_0178,HELP,할 일 관리 기능을 설명해 줘,[],,HELP_04
+cmd_0179,HELP,이 음성 비서가 할 수 있는 일을 소개해 줘,[],,HELP_04
+cmd_0180,HELP,지원하는 기능 목록을 보여 주세요,[],,HELP_04
