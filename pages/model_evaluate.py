@@ -24,19 +24,21 @@ def render_evaluate_view():
             st.subheader('의도별 평가 지표')
             st.dataframe(df, use_container_width=True, hide_index=True)
 
-        if cm_path.exists():
-            st.subheader('혼동행렬')
-            st.image(str(cm_path), use_container_width=True)
-
         if errors_path.exists():
             errors = pd.read_csv(errors_path)
 
-            st.subheader('오류 사례')
+            st.subheader('대표 오류 사례')
 
             if errors.empty:
                 st.info('오분류 사례가 없습니다')
             else:
-                st.dataframe(df, use_container_width=True, hide_index=True)
+                st.dataframe(errors, use_container_width=True, hide_index=True)
+
+        if cm_path.exists():
+            st.subheader('혼동 행렬')
+            st.image(str(cm_path), use_container_width=True)
+
+
 
 
 
