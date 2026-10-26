@@ -8,6 +8,7 @@ from pages.home import render_home_view
 from pages.memo import render_memo_view, init_memo_state
 from pages.todo import render_todo_view, init_task_state
 from pages.history import render_history_view, init_history_state
+from pages.model_evaluate import render_evaluate_view
 
 # 0. 전역 페이지 설정
 st.set_page_config(
@@ -65,6 +66,7 @@ pages = [
     st.Page(render_memo_view, title="메모 관리", icon="📝"),
     st.Page(render_todo_view, title="할 일 관리", icon="📅"),
     st.Page(render_history_view, title="처리 이력", icon="📊"),
+    st.Page(render_evaluate_view, title="모델 평가", icon="📈"),
 ]
 
 pg = st.navigation(pages)

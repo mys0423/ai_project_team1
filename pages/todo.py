@@ -1,8 +1,6 @@
 # views/todo.py
-# 할 일 관리 페이지 (FullCalendar & HTML 격자 뷰)
+# 할 일 관리 페이지 (FullCalendar & 할 일 목록 탭 구성)
 
-import calendar as py_calendar
-import html
 from datetime import date, datetime, time
 import streamlit as st
 
@@ -49,37 +47,6 @@ def render_calendar(tasks, key='task_calendar'):
     return full_cal(events=tasks_to_events(tasks), options=options, key=key)
 
 
-_CSS = """<style>
-.cal{display:grid;grid-template-columns:repeat(7,1fr);gap:1px;background:#e2e8f0;border:1px solid #cbd5e1;border-radius:12px;overflow:hidden;margin-top:10px}
-.cal .h{background:#f1f5f9;text-align:center;padding:10px 0;font-size:14px;font-weight:700;color:#334155}
-.cal .d{background:#ffffff;min-height:92px;padding:6px 8px;font-size:12px;position:relative}
-.cal .d.o{background:#f8fafc;color:#94a3b8}
-.cal .d.t b{background:#6366f1;color:#ffffff;border-radius:50%;padding:2px 7px}
-.cal .e{margin-top:4px;padding:3px 6px;border-radius:6px;color:#1e1b4b;font-size:11px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-</style>"""
-
-
-def month_grid_html(year, month, tasks, today=None):
-    today = today or date.today()
-    by_day = {}
-    for i, t in enumerate(tasks):
-        d_val = t.get('due_date')
-        if d_val:
-            by_day.setdefault(d_val, []).append((i, t))
-
-    cells = [f'<div class="h">{name}</div>' for name in '일월화수목금토']
-    for d in py_calendar.Calendar(firstweekday=6).itermonthdates(year, month):
-        classes = 'd' + (' o' if d.month != month else '') + (' t' if d == today else '')
-        chips = ''
-        for i, t in by_day.get(d, []):
-            color = DONE_COLOR if t.get('is_done') else PALETTE[i % len(PALETTE)]
-            when = f"{t['due_time']:%H:%M} " if t.get('due_time') else ''
-            chips += f'<div class="e" style="background:{color}">{html.escape(when + t["content"])}</div>'
-        cells.append(f'<div class="{classes}"><b>{d.day}</b>{chips}</div>')
-
-    return _CSS + '<div class="cal">' + ''.join(cells) + '</div>'
-
-
 def _demo_tasks():
     today = date.today()
     return [
@@ -121,20 +88,61 @@ def render_todo_view():
                     st.toast("일정을 등록했습니다.", icon="📅")
                     st.rerun()
 
-    view_mode = st.segmented_control(
-        "달력 보기 방식",
-        ["인터랙티브 캘린더 (FullCalendar)", "HTML 격자 뷰"],
-        default="인터랙티브 캘린더 (FullCalendar)",
-        label_visibility="collapsed"
-    )
+    tab_cal, tab_list = st.tabs(["📅 캘린더", "📋 할 일 목록"])
 
-    if view_mode == "인터랙티브 캘린더 (FullCalendar)":
+    with tab_cal:
         render_calendar(st.session_state.tasks)
-    else:
-        today = date.today()
-        st.markdown(month_grid_html(today.year, today.month, st.session_state.tasks), unsafe_allow_html=True)
 
+    with tab_list:
+        if not st.session_state.tasks:
+            st.info("등록된 할 일이 없습니다. 새 일정을 추가해보세요!")
+        else:
+            filter_status = st.segmented_control(
+                "필터",
+                ["전체", "미완료", "완료"],
+                default="전체",
+                label_visibility="collapsed"
+            )
 
-if __name__ == '__main__':
-    st.set_page_config(page_title="할 일 관리", layout="centered")
-    render_todo_view()
+            tasks = st.session_state.tasks
+            if filter_status == "미완료":
+                displayed = [(i, t) for i, t in enumerate(tasks) if not t.get('is_done')]
+            elif filter_status == "완료":
+                displayed = [(i, t) for i, t in enumerate(tasks) if t.get('is_done')]
+            else:
+                displayed = [(i, t) for i, t in enumerate(tasks)]
+
+            if not displayed:
+                st.info(f"{filter_status} 상태의 할 일이 없습니다.")
+            else:
+                for idx, t in displayed:
+                    col_check, col_content, col_date, col_del = st.columns([1, 6, 3, 1], vertical_alignment="center")
+                    is_done = t.get('is_done', False)
+
+                    with col_check:
+                        checked = st.checkbox("완료 여부", value=is_done, key=f"chk_task_{idx}", label_visibility="collapsed")
+                        if checked != is_done:
+                            t['is_done'] = checked
+                            st.rerun()
+
+                    with col_content:
+                        if is_done:
+                            st.markdown(f"<span style='text-decoration: line-through; color: #94A3B8; font-size: 1rem;'>{t.get('content', '')}</span>", unsafe_allow_html=True)
+                        else:
+                            st.markdown(f"<span style='font-weight: 600; color: #1E293B; font-size: 1rem;'>{t.get('content', '')}</span>", unsafe_allow_html=True)
+
+                    with col_date:
+                        due = t.get('due_date')
+                        if due:
+                            due_str = due.strftime("%Y-%m-%d") if hasattr(due, 'strftime') else str(due)
+                            today = date.today()
+                            if isinstance(due, (date, datetime)) and due == today:
+                                st.markdown("<span style='background: #FEE2E2; color: #DC2626; padding: 3px 8px; border-radius: 6px; font-size: 0.82rem; font-weight: 700;'>🚨 오늘 마감</span>", unsafe_allow_html=True)
+                            else:
+                                st.markdown(f"<span style='color: #64748B; font-size: 0.85rem;'>📅 {due_str}</span>", unsafe_allow_html=True)
+
+                    with col_del:
+                        if st.button("🗑️", key=f"btn_del_{idx}", help="삭제", type="tertiary"):
+                            st.session_state.tasks.pop(idx)
+                            st.toast("할 일을 삭제했습니다.", icon="🗑️")
+                            st.rerun()
