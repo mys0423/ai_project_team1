@@ -11,6 +11,8 @@ from sklearn.svm import LinearSVC
 import pandas as pd
 from pathlib import Path
 from util.print_util import pp
+import re
+from datetime import date, timedelta
 
 
 
@@ -129,6 +131,54 @@ def train_model(csv_path=CSV_PATH):
 
     return model, model_name
 
+def extract_slots(text):
+
+    slots = {}
+    today = date.today()
+
+    date_pattern = (
+        r'(?<!\d)(\d{4})-(\d{1,2})-(\d{1,2})(?!\d)'
+        r'|(?:(\d{4})년\s*)?(\d{1,2})월\s*(\d{1,2})일'
+        r'|오늘|내일|모레'
+    )
+    date_match = re.search(date_pattern, text)
+
+    if date_match:
+        date_text = date_match.group()
+        if date_text in ('오늘', '내일', '모레'):
+            days = {'오늘':0, '내일':1, '모레':2}
+            due_date = today + timedelta(days=days[date_text])
+        else:
+            year = date_match.group(1) or date_match.group(4)
+            month = int(date_match.group(2) or date_match.group(5))
+            day = int(date_match.group(3) or date_match.group(6))
+            if year:
+                due_date = date(int(year), month, day)
+            else:
+                due_date = date(today.year, month, day)
+                if due_date < today:
+                    due_date = date(today.year + 1, month, day)
+
+        slots['DUE_DATE'] = due_date.isoformat()
+
+    title_text = text
+    if date_match:
+        title_text = (
+            text[:date_match.start()] + ' ' + text[date_match.end():]
+        ).strip()
+
+    title_text = re.sub(r'^\s*(?:에|에는|에다가|할\s*일에)\s*', '', title_text)
+    title_match = re.search(r'(.+?)\s*추가해\s*줘?', title_text)
+    if title_match:
+        title = title_match.group(1).strip()
+        title = re.sub(r'^(?:할\s*일에|에|에는|에다가)\s*', '', title)
+        title = re.sub(r'\s*(?:을|를)\s*$', '', title).strip()
+        if title:
+            slots['TITLE'] = title
+
+    return slots
+
+
 # return -> intent: 의도, confidenc_or_score
 def predict_intent(text):
     if not text.strip():
@@ -149,18 +199,20 @@ def predict_intent(text):
         'model_name': model_name,
         'intent': intent,
         'confidence_or_score': float(confidence_or_score),
-        'score_type': score_type
+        'score_type': score_type,
+        'slots': extract_slots(text)
     }
 
 if __name__ == '__main__':
     samples = [
-        '내일 운동 추가해줘',
-        '할 일 목록 보여줘',
-        '회의 일정 수정해줘',
+        '내일 할 일에 운동 추가해줘',
+        '내일 할 일 목록 보여줘',
+        '2026-10-30일 회의 일정 수정해줘',
         '운동 완료했어',
-        '할 일 삭제해줘',
-        '메모에 발표 작성해줘',
-        '이건 뭐야'
+        '모레 할 일 삭제해줘',
+        '메모에 2026-10-30일 발표 작성해줘',
+        '이건 뭐야',
+        '택배 보내기를 오늘 할 일로 등록해 주세요'
     ]
     for text in samples:
         pp(text, predict_intent(text))

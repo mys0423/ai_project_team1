@@ -85,11 +85,11 @@ def list_task(due_date):
             return cur.fetchall()
 
 # 수정
-def update_data(data_id, due_date, content, completed):
+def update_data(data_id, title, due_date, content, completed):
     sql = load_sql('update_data.sql')
     with get_connection() as conn:
         with conn.cursor() as cur:
-            cur.execute(sql, (due_date, content, completed, data_id))
+            cur.execute(sql, (title, due_date, content, completed, data_id))
             return cur.rowcount
 
 # 메모 삭제

@@ -1,109 +1,75 @@
-# app.py
-# UI
-import pandas as pd
+# app_home.py
+# 실행: python -m streamlit run app_home.py
+
 import streamlit as st
 
-from src.audio1 import *
-from src.db import *
+# 페이지별 뷰 모듈 불러오기
+from pages.home import render_home_view
+from pages.memo import render_memo_view, init_memo_state
+from pages.todo import render_todo_view, init_task_state
+from pages.history import render_history_view, init_history_state
+from pages.model_evaluate import render_evaluate_view
 
-st.set_page_config('테스트')
+# 0. 전역 페이지 설정
+st.set_page_config(
+    page_title='나만의 AI 음성 비서',
+    page_icon='🎙️',
+    layout='centered'
+)
 
-def main():
+st.title('나만의 AI 음성 비서')
 
-    st.title('테스트')
-    if not DATABASE_URL:
-        st.error("DATABASE_URL을 설정하세요.")
-        st.stop()
+# 1. 공통 세션 상태 초기화
+if "edited_text" not in st.session_state:
+    st.session_state.edited_text = ""
+if "stt_time" not in st.session_state:
+    st.session_state.stt_time = 0.0
+if "result" not in st.session_state:
+    st.session_state.result = None
 
-    try:
-        create_table()
-        with st.form('memo'):
-            # memo = st.file_uploader('메모 음성 파일', type=['wav'])
-            memo = st.text_input('메모 음성 파일')
-            submitted = st.form_submit_button('메모 저장')
-        if submitted:
-            if not memo:
-                st.warning('음성파일을 올려주세요')
-            else:
-                add_memo(memo)
-
-        with st.form('task'):
-            # task = st.file_uploader('할 일 음성 파일', type=['wav'])
-            title = st.text_input('할 일 제목')
-            content = st.text_input('할 일 내용')
-            due_date = st.date_input('기간')
-            submitted = st.form_submit_button('할일 저장')
-
-        if submitted:
-            if not title or not content:
-                st.warning('음성파일을 올려주세요')
-            else:
-                add_task(
-                    title = title.strip(),
-                    content = content.strip(),
-                    due_date = due_date,
-                )
-
-        st.subheader('메모')
-        rows = list_memo()
-        st.dataframe(
-            pd.DataFrame(rows),
-            use_container_width=True,
-            hide_index=True
-        )
-        st.subheader('할 일')
-        row = list_all_task()
-        st.dataframe(
-            pd.DataFrame(row),
-            use_container_width=True,
-            hide_index=True
-        )
-
-    except psycopg.Error as e:
-        st.error(f'{e}')
+init_memo_state()
+init_task_state()
+init_history_state()
 
 
+# 2. 사이드바 메뉴 크기 시원하게 확대하는 CSS
+st.markdown("""
+<style>
+/* 사이드바 네비게이션 글씨 및 버튼 크기 시원하게 확대 */
+[data-testid="stSidebarNav"] span,
+[data-testid="stSidebar"] a span,
+section[data-testid="stSidebar"] li span {
+    font-size: 1.15rem !important;
+    font-weight: 600 !important;
+}
 
+[data-testid="stSidebarNav"] a,
+section[data-testid="stSidebar"] a {
+    padding-top: 12px !important;
+    padding-bottom: 12px !important;
+    padding-left: 14px !important;
+    margin-bottom: 8px !important;
+    border-radius: 10px !important;
+    transition: all 0.2s ease-in-out;
+}
 
-if __name__ == "__main__":
-    main()
+[data-testid="stSidebarNav"] a:hover,
+section[data-testid="stSidebar"] a:hover {
+    transform: translateX(4px);
+}
+</style>
+""", unsafe_allow_html=True)
 
+# 3. 사이드바 네비게이션 정의 (한글 이름 및 아이콘 설정)
+pages = [
+    st.Page(render_home_view, title="음성 비서 홈", icon="🎙️", default=True),
+    st.Page(render_memo_view, title="메모 관리", icon="📝"),
+    st.Page(render_todo_view, title="할 일 관리", icon="📅"),
+    st.Page(render_history_view, title="처리 이력", icon="📊"),
+    st.Page(render_evaluate_view, title='모델 평가', icon='📃')
+]
 
+pg = st.navigation(pages)
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+# 4. 선택된 페이지 화면 렌더링
+pg.run()

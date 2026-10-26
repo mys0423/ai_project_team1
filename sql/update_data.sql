@@ -1,5 +1,6 @@
 UPDATE tasks
 SET
+    title = %s,
     due_date = %s,
     content = %s,
     completed = %s,

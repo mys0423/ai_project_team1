@@ -33,7 +33,7 @@ def transcript_wav(audio, model_size="base"):
     preprocess_audio, info = preprocess(audio_bytes, check_duplicate=False)
 
     # 16kHz float32 NumPy 배열 변환
-    audio_data,  = sf.read(io.BytesIO(preprocess_audio), dtype="float32")
+    audio_data, _ = sf.read(io.BytesIO(preprocess_audio), dtype="float32")
 
     model = load_stt_model(model_size)
 
