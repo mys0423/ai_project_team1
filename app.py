@@ -31,7 +31,6 @@ init_memo_state()
 init_task_state()
 init_history_state()
 
-
 # 2. 사이드바 메뉴 크기 시원하게 확대하는 CSS
 st.markdown("""
 <style>

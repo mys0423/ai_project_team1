@@ -1,5 +1,4 @@
 *.md
-*.csv
 .venv/
 venv/
 __pycache__/
