@@ -9,6 +9,8 @@ from pages.memo import render_memo_view, init_memo_state
 from pages.todo import render_todo_view, init_task_state
 from pages.history import render_history_view, init_history_state
 from pages.model_evaluate import render_evaluate_view
+from assets.app_style_snippet import apply_common_style
+from src.db import has_database_url, get_connection
 
 # 0. 전역 페이지 설정
 st.set_page_config(
@@ -16,8 +18,11 @@ st.set_page_config(
     page_icon='🎙️',
     layout='centered'
 )
+apply_common_style()
 
 st.title('나만의 AI 음성 비서')
+
+
 
 # 1. 공통 세션 상태 초기화
 if "edited_text" not in st.session_state:

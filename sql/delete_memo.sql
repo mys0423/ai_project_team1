@@ -1,2 +1,1 @@
-DELETE FROM memos
-WHERE id = %s
+DELETE FROM memos WHERE id = %s RETURNING id;

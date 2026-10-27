@@ -1,11 +1,5 @@
-# db.py
+# src/db.py
 # 프로젝트 DB
-'''
-database_url 검사
-sql 불러오고
-테이블 생성, 수정, 조회 및 삭제
-'''
-
 
 import os
 import psycopg
@@ -16,8 +10,15 @@ from pathlib import Path
 load_dotenv()
 
 DATABASE_URL = os.getenv("DATABASE_URL")
+if not DATABASE_URL:
+    try:
+        import streamlit as st
+        DATABASE_URL = st.secrets.get("DATABASE_URL")
+    except Exception:
+        pass
 
-# sql폴더
+
+# sql 폴더
 SQL_DIR = Path(__file__).resolve().parent.parent / 'sql'
 if not SQL_DIR.exists():
     SQL_DIR.mkdir(parents=True, exist_ok=True)
@@ -42,7 +43,9 @@ def create_table():
     sql = load_sql('schema.sql')
     with get_connection() as conn:
         with conn.cursor() as cur:
-            cur.execute(sql)
+            for statement in sql.split(';'):
+                if statement.strip():
+                    cur.execute(statement)
 
 # 메모 입력
 def add_memo(content):
@@ -53,30 +56,22 @@ def add_memo(content):
             return cur.fetchone()[0]
 
 # 할 일 생성
-def add_task(title, content, due_date=None):
+def add_task(title, content=None, due_date=None):
     sql = load_sql('add_task.sql')
     with get_connection() as conn:
         with conn.cursor() as cur:
-            cur.execute(sql, (title, content, due_date,))
+            cur.execute(sql, (title, content, due_date))
             return cur.fetchone()[0]
 
 # 최근 메모 조회
-def list_memo():
+def list_memo(limit=10):
     sql = load_sql('list_memo.sql')
     with get_connection() as conn:
         with conn.cursor(row_factory=dict_row) as cur:
-            cur.execute(sql)
+            cur.execute(sql, (limit,))
             return cur.fetchall()
 
-# 전체 조회
-def list_all_task():
-    sql = load_sql('list_all_tasks.sql')
-    with get_connection() as conn:
-        with conn.cursor(row_factory=dict_row) as cur:
-            cur.execute(sql)
-            return cur.fetchall()
-
-# 날짜별 조회
+# 날짜별 할 일 조회
 def list_task(due_date):
     sql = load_sql('list_task.sql')
     with get_connection() as conn:
@@ -84,12 +79,20 @@ def list_task(due_date):
             cur.execute(sql, (due_date,))
             return cur.fetchall()
 
-# 수정
-def update_data(data_id, title, due_date, content, completed):
-    sql = load_sql('update_data.sql')
+# 전체 할 일 목록 조회 (화면 UI용)
+def list_all_tasks(limit=100):
+    sql = load_sql('list_all_tasks.sql')
+    with get_connection() as conn:
+        with conn.cursor(row_factory=dict_row) as cur:
+            cur.execute(sql, (limit,))
+            return cur.fetchall()
+
+# 할 일 수정 및 완료 처리
+def update_task(data_id, due_date=None, content=None, completed=None):
+    sql = load_sql('update_task.sql')
     with get_connection() as conn:
         with conn.cursor() as cur:
-            cur.execute(sql, (title, due_date, content, completed, data_id))
+            cur.execute(sql, (due_date, content, completed, data_id))
             return cur.rowcount
 
 # 메모 삭제
@@ -100,7 +103,7 @@ def delete_memo(data_id):
             cur.execute(sql, (data_id,))
             return cur.rowcount
 
-# task 삭제
+# 할 일 삭제
 def delete_task(data_id):
     sql = load_sql('delete_task.sql')
     with get_connection() as conn:
@@ -108,167 +111,18 @@ def delete_task(data_id):
             cur.execute(sql, (data_id,))
             return cur.rowcount
 
-# 음성 명령 처리 입력
-def add_voice_runs(transcript, intent, response_text, status, latency_ms):
-    sql = load_sql('add_voice_runs.sql')
+# 음성 명령 처리 이력 입력
+def add_voice_runs(transcript, intent, status, response_text=None, latency_ms=None, error_message=None):
+    sql = load_sql('add_voice_run.sql')
     with get_connection() as conn:
         with conn.cursor() as cur:
-            cur.execute(sql, (transcript, intent, response_text, status, latency_ms))
+            cur.execute(sql, (transcript, intent, status, response_text, latency_ms, error_message))
             return cur.fetchone()[0]
 
-def list_voice_runs():
+# 음성 명령 처리 이력 조회
+def list_voice_runs(limit=100):
     sql = load_sql('list_voice_runs.sql')
     with get_connection() as conn:
         with conn.cursor(row_factory=dict_row) as cur:
-            cur.execute(sql)
+            cur.execute(sql, (limit,))
             return cur.fetchall()
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

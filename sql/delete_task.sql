@@ -1,2 +1,1 @@
-DELETE FROM tasks
-WHERE id = %s
+DELETE FROM tasks WHERE id = %s RETURNING id;

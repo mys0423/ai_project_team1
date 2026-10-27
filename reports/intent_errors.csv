@@ -1,2 +1,2 @@
-﻿text,intent,predict
+﻿text,true_intent,predict_intent
 도움말 보여 줘,HELP,LIST_MEMO

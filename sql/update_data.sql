@@ -1,8 +1,7 @@
 UPDATE tasks
-SET
-    title = %s,
-    due_date = %s,
-    content = %s,
-    completed = %s,
-    updated_at = now()
-WHERE id = %s;
+SET due_date   = COALESCE(%s, due_date),
+    content    = COALESCE(%s, content),
+    completed  = COALESCE(%s, completed),
+    updated_at = NOW()
+WHERE id = %s
+RETURNING id;
