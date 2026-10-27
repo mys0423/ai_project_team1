@@ -48,7 +48,37 @@ def render_calendar(tasks, key='task_calendar'):
         'headerToolbar': {'left': 'prev,next today', 'center': 'title', 'right': ''},
         'displayEventTime': True,
     }
-    return full_cal(events=tasks_to_events(tasks), options=options, key=key)
+    custom_css = """
+    .fc {
+        background-color: #ffffff;
+        border-radius: 14px;
+        padding: 16px;
+        color: #252943;
+    }
+    .fc-theme-standard th {
+        background: #eef2ff !important;
+        color: #252943 !important;
+        font-weight: 600 !important;
+        padding: 8px 0 !important;
+    }
+    .fc-col-header-cell-cushion, .fc-daygrid-day-number {
+        color: #252943 !important;
+        text-decoration: none !important;
+    }
+    .fc-toolbar-title {
+        color: #252943 !important;
+        font-weight: 700 !important;
+    }
+    .fc-button-primary {
+        background-color: #7867ed !important;
+        border-color: #7867ed !important;
+    }
+    .fc-button-primary:hover {
+        background-color: #6654d9 !important;
+        border-color: #6654d9 !important;
+    }
+    """
+    return full_cal(events=tasks_to_events(tasks), options=options, custom_css=custom_css, key=key)
 
 
 def _demo_tasks():

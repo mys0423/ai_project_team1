@@ -212,19 +212,19 @@ def render_memo_view():
                     # 카드 본문을 누르면 전체 내용 팝업
                     if st.button(preview(memo["content"]), key=f"open_{memo['id']}", type="tertiary"):
                         open_memo(memo)
-                    bottom_l, bottom_r = st.columns([4, 1], vertical_alignment="center")
+                    bottom_l, bottom_r = st.columns([3.2, 1.2], vertical_alignment="center")
                     bottom_l.caption(time_label(memo["created_at"]))
                     with bottom_r:
                         left, right = st.columns(2)
+                        with left:
+                            if st.button("", icon=":material/edit:", type="tertiary",
+                                      key=f"update_{memo['id']}", help="메모 수정",
+                                      on_click=update_memo, args=(memo["id"], memo["content"],)):
+                                st.session_state[f'editing_{memo["id"]}'] = True
                         with right:
                             st.button("", icon=":material/delete:", key=f"del_{memo['id']}",
                                     type="tertiary", help="삭제",
                                     on_click=delete_memo, args=(memo["id"],))
-                        with left:
-                            if st.button('메모수정', icon='✏️', type="tertiary",
-                                      key=f"update_{memo['id']}", help='메모 수정',
-                                      on_click=update_memo, args=(memo["id"], memo["content"],)):
-                                st.session_state[f'editing_{memo["id"]}'] = True
                     if st.session_state.get(f'editing_{memo["id"]}', False):
                         new_content = st.text_input(
                             '수정할 내용',

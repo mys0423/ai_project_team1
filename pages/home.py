@@ -85,7 +85,8 @@ def handle_process_text(text: str, input_type: str = "직접 녹음"):
 
 
 def render_home_view():
-    st.header('음성 비서 홈')
+    st.title('🎙️ 나만의 AI 음성 비서')
+    st.caption('한국어 음성 명령으로 메모와 일정을 간편하게 관리하세요.')
 
     tab1, tab2 = st.tabs(['녹음/텍스트입력', '파일 업로드'])
 
