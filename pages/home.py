@@ -84,16 +84,12 @@ def handle_process_text(text: str):
 def render_home_view():
     st.header('음성 비서 홈')
 
-    input_type = st.radio(
-        '입력 방식',
-        ['녹음/텍스트 입력', '파일 업로드'],
-        horizontal=True
-    )
+    tab1, tab2 = st.tabs(['녹음/텍스트입력', '파일 업로드'])
 
     if "recorded_audio" not in st.session_state:
         st.session_state.recorded_audio = None
 
-    if input_type == '녹음/텍스트 입력':
+    with tab1:
         prompt = st.chat_input(
             '명령어를 입력하거나 음성 녹음을 실행하세요',
             accept_audio=True,
@@ -119,7 +115,7 @@ def render_home_view():
             st.caption("🎙️ 녹음된 음성 확인:")
             st.audio(st.session_state.recorded_audio, format="audio/wav")
 
-    if input_type == '파일 업로드':
+    with tab2:
         wav_file = st.file_uploader(
             'wav파일을 업로드하세요',
             type=['wav', 'mp3']
