@@ -93,34 +93,36 @@ def _demo_tasks():
 
 
 def init_task_state():
-    if "tasks" not in st.session_state:
-        # DB 연결 시 DB 데이터 우선 로드
-        if has_database_url():
-            try:
-                db_tasks = list_all_tasks(limit=100)
-                if db_tasks:
-                    loaded = []
-                    for row in db_tasks:
-                        d_val = row.get('due_date')
-                        if isinstance(d_val, str):
-                            try:
-                                d_val = date.fromisoformat(d_val)
-                            except Exception:
-                                d_val = None
-                        elif isinstance(d_val, datetime):
-                            d_val = d_val.date()
+    # DB 연결 시 항상 실제 DB 데이터와 동기화
+    if has_database_url():
+        try:
+            db_tasks = list_all_tasks(limit=100)
+            loaded = []
+            if db_tasks:
+                for row in db_tasks:
+                    d_val = row.get('due_date')
+                    if isinstance(d_val, str):
+                        try:
+                            d_val = date.fromisoformat(d_val)
+                        except Exception:
+                            d_val = None
+                    elif isinstance(d_val, datetime):
+                        d_val = d_val.date()
 
-                        loaded.append({
-                            'id': str(row.get('id')),
-                            'content': row.get('title') or '(제목 없음)',
-                            'due_date': d_val,
-                            'due_time': None,
-                            'is_done': bool(row.get('completed', False)),
-                        })
-                    st.session_state.tasks = loaded
-                    return
-            except Exception:
-                pass
+                    loaded.append({
+                        'id': str(row.get('id')),
+                        'content': row.get('title') or '(제목 없음)',
+                        'due_date': d_val,
+                        'due_time': None,
+                        'is_done': bool(row.get('completed', False)),
+                    })
+            st.session_state.tasks = loaded
+            return
+        except Exception:
+            pass
+
+    # DB 미연결 시에만 데모 데이터 사용
+    if "tasks" not in st.session_state:
         st.session_state.tasks = _demo_tasks()
 
 
