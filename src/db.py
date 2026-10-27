@@ -10,6 +10,13 @@ from pathlib import Path
 load_dotenv()
 
 DATABASE_URL = os.getenv("DATABASE_URL")
+if not DATABASE_URL:
+    try:
+        import streamlit as st
+        DATABASE_URL = st.secrets.get("DATABASE_URL")
+    except Exception:
+        pass
+
 
 # sql 폴더
 SQL_DIR = Path(__file__).resolve().parent.parent / 'sql'

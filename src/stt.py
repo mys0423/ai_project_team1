@@ -19,12 +19,12 @@ from src.audio import preprocess
 
 # 1. 모델 불러오기
 @lru_cache(maxsize=1)
-def load_stt_model(model_size="tiny"):
+def load_stt_model(model_size="base"):
     return WhisperModel(model_size, device="cpu", compute_type="int8", cpu_threads=2)
 
 
 # 2. 전사 처리
-def transcript_wav(audio, model_size="tiny"):
+def transcript_wav(audio, model_size="base"):
     start = time.perf_counter()
 
     # 파일 경로 또는 bytes 처리
