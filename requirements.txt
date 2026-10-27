@@ -6,3 +6,8 @@ pandas
 python-dotenv
 psycopg[binary]
 scikit-learn
+streamlit-calendar
+soundfile
+scipy
+matplotlib
+joblib
