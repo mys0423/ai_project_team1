@@ -38,7 +38,7 @@ def init_memo_state():
 
 
 # ---------------------------------------------------------------------------
-# 동작 
+# 동작
 # ---------------------------------------------------------------------------
 def add_memo():
     text = st.session_state.new_memo.strip()
@@ -54,6 +54,27 @@ def add_memo():
 def delete_memo(memo_id):
     st.session_state.memos = [m for m in st.session_state.memos if m["id"] != memo_id]
     st.toast("메모를 삭제했습니다.", icon="🗑️")
+
+def update_memo(memo_id, new_content):
+    edit_key = f"edit_content_{memo_id}"
+    if new_content is None:
+        new_content = st.session_state.get(edit_key, "")
+    new_content = new_content.strip()
+
+    if not new_content:
+        st.session_state.pending_toast = ('수정할 내용을 입력해 주세요', '⚠️')
+        return
+
+    for m in st.session_state.memos:
+        if m['id'] == memo_id:
+            if m['content'] == new_content:  # 바뀐 내용이 없으면 조용히 종료
+                return
+            m['content'] = new_content
+            st.session_state.pop(edit_key, None)  # 카드 입력칸이 새 내용으로 다시 채워지도록
+            # st.toast를 바로 부르면 팝업의 st.rerun()에 지워지므로,
+            # 메시지를 맡겨 두고 render_memo_view()가 다시 그려질 때 한 번만 띄웁니다
+            st.session_state.pending_toast = ('메모를 수정했습니다', '✏️')
+            return
 
 
 # ---------------------------------------------------------------------------
@@ -81,12 +102,36 @@ def open_memo(memo):
     st.caption(f"{day_label(t.date())} {time_label(t)}")
     st.markdown(memo["content"])
     st.divider()
-    left, right = st.columns(2)
+    left, middle, right = st.columns(3)
     if left.button("삭제", icon=":material/delete:", use_container_width=True):
         delete_memo(memo["id"])
         st.rerun()
+    if middle.button('수정', icon="✏️", use_container_width=True, key=f'correction_{memo['id']}'):
+        st.session_state[f'editing_{memo["id"]}'] = True
+    if st.session_state.get(f'editing_{memo["id"]}', False):
+        new_content = st.text_input(
+            '수정할 내용',
+            value=memo['content'],
+            key=f'edit_{memo["id"]}'
+        )
+        col1, col2 = st.columns(2)
+
+        with col1:
+            if st.button('저장', key=f'save_{memo["id"]}', type="tertiary"):
+                if new_content.strip():
+                    update_memo(memo['id'], new_content)
+
+                    st.session_state[f'editing_{memo["id"]}'] = False
+                    st.rerun()
+                else:
+                    st.warning('수정할 내용을 입력해주세요')
+        with col2:
+            if st.button('취소', key=f'cancel_{memo["id"]}', type="tertiary"):
+                st.session_state[f'editing_{memo["id"]}'] = False
+                st.rerun()
     if right.button("닫기", type="primary", use_container_width=True):
         st.rerun()
+
 
 
 # ---------------------------------------------------------------------------
@@ -94,6 +139,10 @@ def open_memo(memo):
 # ---------------------------------------------------------------------------
 def render_memo_view():
     init_memo_state()
+
+    pending = st.session_state.pop("pending_toast", None)
+    if pending:
+        st.toast(pending[0], icon=pending[1])
 
     # 카드 스타일: key가 "memo_"로 시작하는 컨테이너를 노란 메모지처럼 꾸밉니다
     st.markdown(
@@ -108,6 +157,9 @@ def render_memo_view():
             justify-content: space-between;
         }
         div[class*="st-key-memo_"] * { color: #3A2F0B !important; }
+        div[class*="st-key-memo_"] input {color: #FFFFFF !important; 
+        background-color: #262730 !important;
+}
         div[class*="st-key-memo_"] button[kind="tertiary"] p { font-size: 16px; text-align: left; }
         div[class*="st-key-open_"] button { justify-content: flex-start; width: 100%; min-height: 56px; align-items: flex-start; }
         </style>
@@ -130,7 +182,7 @@ def render_memo_view():
                                       default="전체", label_visibility="collapsed")
     with f2:
         keyword = st.text_input("키워드 검색", placeholder="키워드로 찾기 (예: 회의)",
-                                label_visibility="collapsed")
+                                label_visibility="collapsed", key='find')
 
     memos = st.session_state.memos
     today = date.today()
@@ -155,16 +207,45 @@ def render_memo_view():
                     unsafe_allow_html=True)
         cols = st.columns(COLS)
         for i, memo in enumerate(items):
-            with cols[i % COLS]:
+            with (cols[i % COLS]):
                 with st.container(key=f"memo_{memo['id']}"):
                     # 카드 본문을 누르면 전체 내용 팝업
                     if st.button(preview(memo["content"]), key=f"open_{memo['id']}", type="tertiary"):
                         open_memo(memo)
                     bottom_l, bottom_r = st.columns([4, 1], vertical_alignment="center")
                     bottom_l.caption(time_label(memo["created_at"]))
-                    bottom_r.button("", icon=":material/delete:", key=f"del_{memo['id']}",
+                    with bottom_r:
+                        left, right = st.columns(2)
+                        with right:
+                            st.button("", icon=":material/delete:", key=f"del_{memo['id']}",
                                     type="tertiary", help="삭제",
                                     on_click=delete_memo, args=(memo["id"],))
+                        with left:
+                            if st.button('메모수정', icon='✏️', type="tertiary",
+                                      key=f"update_{memo['id']}", help='메모 수정',
+                                      on_click=update_memo, args=(memo["id"], memo["content"],)):
+                                st.session_state[f'editing_{memo["id"]}'] = True
+                    if st.session_state.get(f'editing_{memo["id"]}', False):
+                        new_content = st.text_input(
+                            '수정할 내용',
+                            value=memo['content'],
+                            key=f'edit_{memo["id"]}'
+                        )
+                        col1, col2 = st.columns(2)
+
+                        with col1:
+                            if st.button('저장', key=f'save_{memo["id"]}', type="tertiary"):
+                                if new_content.strip():
+                                    update_memo(memo['id'], new_content)
+                                    st.session_state[f'editing_{memo["id"]}'] = False
+                                    st.rerun()
+                                else:
+                                    st.warning('수정할 내용을 입력해주세요')
+                        with col2:
+                            if st.button('취소', key=f'cancel_{memo["id"]}', type="tertiary"):
+                                st.session_state[f'editing_{memo["id"]}'] = False
+                                st.rerun()
+
         st.write("")
 
 

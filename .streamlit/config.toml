@@ -1,0 +1,16 @@
+[theme]
+base = "light"
+
+# 강조색
+primaryColor = "#7867ed"
+
+# 본문·표 배경
+backgroundColor = "#ffffff"
+
+# 표 머리글·보조 영역 배경
+secondaryBackgroundColor = "#eeebff"
+
+# 표·기본 글씨
+textColor = "#252943"
+
+font = "sans serif"

@@ -7,17 +7,41 @@ import streamlit as st
 from pages.home import render_home_view
 from pages.memo import render_memo_view, init_memo_state
 from pages.todo import render_todo_view, init_task_state
-from pages.history import render_history_view, init_history_state
+from pages.history import render_history_view
 from pages.model_evaluate import render_evaluate_view
 
+
+
+from pathlib import Path
 # 0. 전역 페이지 설정
 st.set_page_config(
     page_title='나만의 AI 음성 비서',
     page_icon='🎙️',
     layout='centered'
-)
 
+)
+# 전체 페이지 공통 스타일
+css_path = Path(__file__).resolve().parent / "assets" / "style.css"
+
+st.markdown(
+    "<style>" + css_path.read_text(encoding="utf-8") + "</style>",
+    unsafe_allow_html=True
+)
 st.title('나만의 AI 음성 비서')
+
+def apply_common_style():
+    css_path = Path(__file__).resolve().parent / "assets" / "style.css"
+    if css_path.exists():
+        st.markdown(
+            "<style>" + css_path.read_text(encoding="utf-8") + "</style>",
+            unsafe_allow_html=True,
+        )
+    else:
+        st.warning("assets/style.css 파일을 찾을 수 없습니다.")
+
+
+apply_common_style()
+
 
 # 1. 공통 세션 상태 초기화
 if "edited_text" not in st.session_state:
@@ -29,7 +53,7 @@ if "result" not in st.session_state:
 
 init_memo_state()
 init_task_state()
-init_history_state()
+# init_history_state()
 
 
 # 2. 사이드바 메뉴 크기 시원하게 확대하는 CSS
@@ -66,7 +90,7 @@ pages = [
     st.Page(render_memo_view, title="메모 관리", icon="📝"),
     st.Page(render_todo_view, title="할 일 관리", icon="📅"),
     st.Page(render_history_view, title="처리 이력", icon="📊"),
-    st.Page(render_evaluate_view, title="모델 평가", icon="📈"),
+    st.Page(render_evaluate_view, title="모델 평가", icon="📈")
 ]
 
 pg = st.navigation(pages)
