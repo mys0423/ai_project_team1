@@ -48,7 +48,37 @@ def render_calendar(tasks, key='task_calendar'):
         'headerToolbar': {'left': 'prev,next today', 'center': 'title', 'right': ''},
         'displayEventTime': True,
     }
-    return full_cal(events=tasks_to_events(tasks), options=options, key=key)
+    custom_css = """
+    .fc {
+        background-color: #ffffff;
+        border-radius: 14px;
+        padding: 16px;
+        color: #252943;
+    }
+    .fc-theme-standard th {
+        background: #eef2ff !important;
+        color: #252943 !important;
+        font-weight: 600 !important;
+        padding: 8px 0 !important;
+    }
+    .fc-col-header-cell-cushion, .fc-daygrid-day-number {
+        color: #252943 !important;
+        text-decoration: none !important;
+    }
+    .fc-toolbar-title {
+        color: #252943 !important;
+        font-weight: 700 !important;
+    }
+    .fc-button-primary {
+        background-color: #7867ed !important;
+        border-color: #7867ed !important;
+    }
+    .fc-button-primary:hover {
+        background-color: #6654d9 !important;
+        border-color: #6654d9 !important;
+    }
+    """
+    return full_cal(events=tasks_to_events(tasks), options=options, custom_css=custom_css, key=key)
 
 
 def _demo_tasks():
@@ -63,34 +93,36 @@ def _demo_tasks():
 
 
 def init_task_state():
-    if "tasks" not in st.session_state:
-        # DB 연결 시 DB 데이터 우선 로드
-        if has_database_url():
-            try:
-                db_tasks = list_all_tasks(limit=100)
-                if db_tasks:
-                    loaded = []
-                    for row in db_tasks:
-                        d_val = row.get('due_date')
-                        if isinstance(d_val, str):
-                            try:
-                                d_val = date.fromisoformat(d_val)
-                            except Exception:
-                                d_val = None
-                        elif isinstance(d_val, datetime):
-                            d_val = d_val.date()
+    # DB 연결 시 항상 실제 DB 데이터와 동기화
+    if has_database_url():
+        try:
+            db_tasks = list_all_tasks(limit=100)
+            loaded = []
+            if db_tasks:
+                for row in db_tasks:
+                    d_val = row.get('due_date')
+                    if isinstance(d_val, str):
+                        try:
+                            d_val = date.fromisoformat(d_val)
+                        except Exception:
+                            d_val = None
+                    elif isinstance(d_val, datetime):
+                        d_val = d_val.date()
 
-                        loaded.append({
-                            'id': str(row.get('id')),
-                            'content': row.get('title') or '(제목 없음)',
-                            'due_date': d_val,
-                            'due_time': None,
-                            'is_done': bool(row.get('completed', False)),
-                        })
-                    st.session_state.tasks = loaded
-                    return
-            except Exception:
-                pass
+                    loaded.append({
+                        'id': str(row.get('id')),
+                        'content': row.get('title') or '(제목 없음)',
+                        'due_date': d_val,
+                        'due_time': None,
+                        'is_done': bool(row.get('completed', False)),
+                    })
+            st.session_state.tasks = loaded
+            return
+        except Exception:
+            pass
+
+    # DB 미연결 시에만 데모 데이터 사용
+    if "tasks" not in st.session_state:
         st.session_state.tasks = _demo_tasks()
 
 

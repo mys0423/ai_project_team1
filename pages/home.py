@@ -7,6 +7,7 @@ from datetime import date, datetime
 import streamlit as st
 from src.stt import transcript_wav
 from src.core import process_text as core_process_text
+from src.tts import text_to_speech, VOICES
 
 
 def handle_process_text(text: str, input_type: str = "직접 녹음"):
@@ -40,31 +41,35 @@ def handle_process_text(text: str, input_type: str = "직접 녹음"):
         if "tasks" not in st.session_state:
             st.session_state.tasks = []
 
+        is_already_exists = result.get('data', {}).get('already_exists', False) if isinstance(result.get('data'), dict) else False
+
         if intent == 'ADD_MEMO':
-            content = slots.get('MEMO_CONTENT', text)
-            memo_id = result.get('data', {}).get('id') if isinstance(result.get('data'), dict) else str(uuid.uuid4())
-            st.session_state.memos.insert(0, {
-                "id": str(memo_id),
-                "content": content,
-                "created_at": datetime.now()
-            })
+            if not is_already_exists:
+                content = slots.get('MEMO_CONTENT', text)
+                memo_id = result.get('data', {}).get('id') if isinstance(result.get('data'), dict) else str(uuid.uuid4())
+                st.session_state.memos.insert(0, {
+                    "id": str(memo_id),
+                    "content": content,
+                    "created_at": datetime.now()
+                })
 
         elif intent == 'ADD_TASK':
-            title = slots.get('TITLE', text)
-            due_str = slots.get('DUE_DATE')
-            try:
-                due_date = date.fromisoformat(due_str) if due_str else date.today()
-            except Exception:
-                due_date = date.today()
+            if not is_already_exists:
+                title = slots.get('TITLE', text)
+                due_str = slots.get('DUE_DATE')
+                try:
+                    due_date = date.fromisoformat(due_str) if due_str else date.today()
+                except Exception:
+                    due_date = date.today()
 
-            task_id = result.get('data', {}).get('id') if isinstance(result.get('data'), dict) else str(uuid.uuid4())
-            st.session_state.tasks.append({
-                'id': str(task_id),
-                'content': title,
-                'due_date': due_date,
-                'due_time': None,
-                'is_done': False
-            })
+                task_id = result.get('data', {}).get('id') if isinstance(result.get('data'), dict) else str(uuid.uuid4())
+                st.session_state.tasks.append({
+                    'id': str(task_id),
+                    'content': title,
+                    'due_date': due_date,
+                    'due_time': None,
+                    'is_done': False
+                })
 
         elif intent == 'COMPLETE_TASK':
             title = slots.get('TITLE', '')
@@ -85,7 +90,8 @@ def handle_process_text(text: str, input_type: str = "직접 녹음"):
 
 
 def render_home_view():
-    st.header('음성 비서 홈')
+    st.title('🎙️ 나만의 AI 음성 비서')
+    st.caption('한국어 음성 명령으로 메모와 일정을 간편하게 관리하세요.')
 
     tab1, tab2 = st.tabs(['녹음/텍스트입력', '파일 업로드'])
 
@@ -175,6 +181,30 @@ def render_home_view():
     if st.session_state.result is not None:
         result = st.session_state.result
         if result['status'] == '성공':
-            st.success(f"✅ {result['response']}")
+            st.success(result['response'])
         else:
-            st.error(f"❌ {result['response']}")
+            st.error(result['response'])
+
+    st.divider()
+
+    voice_name = st.selectbox(
+        '목소리 선택',
+        list(VOICES.keys())
+    )
+
+    voice = VOICES[voice_name]
+
+    if st.button('음성 재생'):
+        if st.session_state.get('result') is None:
+            st.warning('작업을 먼저 실행해주세요')
+        else:
+            with st.spinner('음성 생성 중...'):
+                t0 = time.perf_counter()
+                audio_bytes = text_to_speech(
+                    st.session_state.result['response'],
+                    voice=voice
+                )
+                tts_sec = time.perf_counter() - t0
+
+            st.audio(audio_bytes, format="audio/mp3", autoplay=True)
+            st.caption(f"⚡ TTS 소요 시간: {tts_sec:.3f}초")

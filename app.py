@@ -1,6 +1,7 @@
 # app.py
 # 실행: python -m streamlit run app.py
 
+from pathlib import Path
 import streamlit as st
 
 # 페이지별 뷰 모듈 불러오기
@@ -17,7 +18,14 @@ st.set_page_config(
     layout='centered'
 )
 
-st.title('나만의 AI 음성 비서')
+# 전체 페이지 공통 스타일 적용
+css_path = Path(__file__).resolve().parent / "assets" / "style.css"
+if css_path.exists():
+    st.markdown(
+        f"<style>{css_path.read_text(encoding='utf-8')}</style>",
+        unsafe_allow_html=True
+    )
+
 
 # 1. 공통 세션 상태 초기화
 if "edited_text" not in st.session_state:
