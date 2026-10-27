@@ -9,7 +9,7 @@ from src.stt import transcript_wav
 from src.core import process_text as core_process_text
 
 
-def handle_process_text(text: str):
+def handle_process_text(text: str, input_type: str = "직접 녹음"):
     result = core_process_text(text)
     intent = result.get('intent', 'UNKNOWN')
     slots = result.get('slots', {})
@@ -23,11 +23,14 @@ def handle_process_text(text: str):
 
     st.session_state.history.insert(0, {
         "transcript": text,
+        "input_type": input_type,
         "intent": intent,
         "status": status,
         "latency_ms": latency_ms,
-        "created_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-        "response": response_msg
+        "created_at": datetime.now(),
+        "response": response_msg,
+        "response_text": response_msg,
+        "error_message": "" if status == '성공' else response_msg
     })
 
     # 2. 메모 / 할 일 세션 상태 동기화 (성공 시)
@@ -100,11 +103,13 @@ def render_home_view():
                 st.session_state.edited_text = prompt.text
                 st.session_state.stt_time = 0.0
                 st.session_state.recorded_audio = None
+                st.session_state.current_input_type = '텍스트'
                 st.rerun()
 
             if prompt.audio:
                 audio_bytes = prompt.audio.getvalue()
                 st.session_state.recorded_audio = audio_bytes
+                st.session_state.current_input_type = '직접 녹음'
                 with st.spinner('음성 인식 처리 중...'):
                     text, elapsed = transcript_wav(audio_bytes)
                 st.session_state.edited_text = text
@@ -128,6 +133,7 @@ def render_home_view():
             if wav_file is None:
                 st.warning('파일을 먼저 업로드해주세요')
             else:
+                st.session_state.current_input_type = '파일 업로드'
                 with st.spinner('파일 분석 중...'):
                     text, elapsed = transcript_wav(wav_file.getvalue())
                 st.session_state.edited_text = text
@@ -159,8 +165,9 @@ def render_home_view():
         if not text:
             st.warning('음성녹음/텍스트 입력, 파일업로드를 먼저 해주세요')
         else:
+            input_type = st.session_state.get('current_input_type', '직접 녹음')
             with st.spinner('AI 의도 분석 및 등록 중...'):
-                result = handle_process_text(text)
+                result = handle_process_text(text, input_type=input_type)
             st.session_state.result = result
             st.session_state.clear_edited_text = True
             st.rerun()

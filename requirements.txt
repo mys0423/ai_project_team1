@@ -11,3 +11,5 @@ soundfile
 scipy
 matplotlib
 joblib
+jiwer
+altair
