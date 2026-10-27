@@ -128,27 +128,27 @@ def render_evaluate_view():
             train_model()
         st.success('모델 평가가 완료되었습니다')
 
-    metrics_path = REPORT_PATH / 'intent_metrics.csv'
-    cm_path = REPORT_PATH / 'confusion_matrix.png'
-    errors_path = REPORT_PATH / 'intent_errors.csv'
+        metrics_path = REPORT_PATH / 'intent_metrics.csv'
+        cm_path = REPORT_PATH / 'confusion_matrix.png'
+        errors_path = REPORT_PATH / 'intent_errors.csv'
 
-    if metrics_path.exists():
-        df = pd.read_csv(metrics_path)
-        render_summary(df)                                          # [추가] 재현율 · F1 요약
-        st.subheader('의도별 평가 지표')
-        st.dataframe(df, use_container_width=True, hide_index=True)
-        render_per_intent_chart(df)                                 # [추가] 의도별 성능
+        if metrics_path.exists():
+            df = pd.read_csv(metrics_path)
+            render_summary(df)                                          # [추가] 재현율 · F1 요약
+            st.subheader('의도별 평가 지표')
+            st.dataframe(df, use_container_width=True, hide_index=True)
+            render_per_intent_chart(df)                                 # [추가] 의도별 성능
 
-    if errors_path.exists():
-        errors = pd.read_csv(errors_path)
-        st.subheader('대표 오류 사례')
-        if errors.empty:
-            st.info('오분류 사례가 없습니다')
-        else:
-            st.dataframe(errors, use_container_width=True, hide_index=True)
+        if errors_path.exists():
+            errors = pd.read_csv(errors_path)
+            st.subheader('대표 오류 사례')
+            if errors.empty:
+                st.info('오분류 사례가 없습니다')
+            else:
+                st.dataframe(errors, use_container_width=True, hide_index=True)
 
-    if metrics_path.exists() and errors_path.exists():             # [추가] 혼동 행렬 시각화
-        render_confusion_chart(df, errors)
+        if metrics_path.exists() and errors_path.exists():             # [추가] 혼동 행렬 시각화
+            render_confusion_chart(df, errors)
 
 if __name__ == '__main__':
     st.set_page_config(page_title="모델 평가", layout="centered")
