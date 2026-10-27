@@ -12,7 +12,11 @@ sys.path.append(str(Path(__file__).resolve().parent.parent))
 
 import soundfile as sf
 from faster_whisper import WhisperModel
-from jiwer import wer, cer
+try:
+    from jiwer import wer, cer
+except ImportError:
+    wer = cer = None
+
 
 from src.audio import preprocess
 
@@ -64,6 +68,8 @@ def transcript_wav(audio, model_size="base"):
 
 # 3. wer, cer 반환
 def evaluate_score(ref, pred):
+    if wer is None or cer is None:
+        raise ImportError("jiwer 패키지가 필요합니다.")
     wer_score = wer(ref, pred)
     cer_score = cer(ref, pred)
     return {
