@@ -35,9 +35,12 @@ if "stt_time" not in st.session_state:
 if "result" not in st.session_state:
     st.session_state.result = None
 
-init_memo_state()
-init_task_state()
-init_history_state()
+if "memos" not in st.session_state:
+    init_memo_state()
+if "tasks" not in st.session_state:
+    init_task_state()
+if "history" not in st.session_state:
+    init_history_state()
 
 
 # 2. 사이드바 메뉴 크기 시원하게 확대하는 CSS
