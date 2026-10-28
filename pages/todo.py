@@ -92,7 +92,10 @@ def _demo_tasks():
     ]
 
 
-def init_task_state():
+def init_task_state(force=False):
+    # 이미 세션에 할 일이 로드되어 있으면 불필요한 원격 DB 반복 조회 방지 (속도 최적화)
+    if not force and "tasks" in st.session_state:
+        return
     # DB 연결 시 항상 실제 DB 데이터와 동기화
     if has_database_url():
         try:

@@ -45,7 +45,7 @@ def transcript_wav(audio, model_size="base"):
     segments, info = model.transcribe(
         audio_data,
         language="ko",
-        beam_size=1,
+        beam_size=6,
         vad_filter=False,
         condition_on_previous_text=False,
         temperature=0

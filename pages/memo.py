@@ -17,7 +17,10 @@ PREVIEW_LEN = 40    # 카드에 보여 줄 글자 수
 # ---------------------------------------------------------------------------
 # 데이터 초기화 및 DB 동기화
 # ---------------------------------------------------------------------------
-def init_memo_state():
+def init_memo_state(force=False):
+    # 이미 세션에 메모가 로드되어 있으면 불필요한 원격 DB 반복 조회 방지 (속도 최적화)
+    if not force and "memos" in st.session_state:
+        return
     # DB 연결 시 항상 실제 DB 데이터와 실시간 동기화
     if has_database_url():
         try:

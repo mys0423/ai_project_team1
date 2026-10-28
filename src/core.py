@@ -418,7 +418,14 @@ def execute(intent, slots):
     return f'작업을 수행할 수 없습니다: {intent}', None
 
 
+@lru_cache(maxsize=1)
+def init_db():
+    if has_database_url():
+        create_table()
+
+
 def process_text(text):
+    init_db()
     t0 = time.perf_counter()
     result = predict_intent(text)
 

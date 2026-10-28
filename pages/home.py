@@ -157,6 +157,54 @@ def render_home_view():
         st.session_state.edited_text = ""
         st.session_state.clear_edited_text = False
 
+    with st.expander('📌 사용 가능한 명령어 예시'):
+        st.info('예시에 맞게 문장을 수정하세요')
+        st.markdown("""
+        **📅 할 일 관리**
+
+        **1. 할 일 추가**
+        - 할 일에 장보기 추가해
+        - 내일 회의 등록해
+        - 할 일 추가: 운동하기
+
+        **2. 할 일 조회**
+        - 오늘 할 일 알려줘
+        - 내일 미완료 할 일 보여줘
+        - 완료한 할 일 보여줘
+
+        **3. 할 일 수정**
+        - 장보기 이름을 마트 가기로 바꿔
+        - 회의 날짜를 내일로 변경해
+
+        **4. 할 일 완료**
+        - 장보기 완료
+        - 운동 다 했어
+        - 할 일 중에 회의 완료
+
+        **5. 할 일 삭제**
+        - 할 일에서 장보기 삭제
+        - 운동 할 일 지워
+        - 장보기 삭제
+
+        ---
+
+        **📝 메모 관리**
+
+        **1. 메모 추가**
+        - 우유 사기 메모해
+        - 메모 추가: 회의 준비
+        - 회의 준비라고 메모해
+        - 메모장에 운동 계획 적어
+
+        **2. 메모 조회**
+        - 메모 목록 보여줘
+        - 회의 관련 메모 보여줘
+
+        **3. 메모 삭제**
+        - 회의 관련 메모 삭제해
+        - 메모 삭제해
+        """)
+
     edited_text = st.text_area(
         '인식된 문장을 확인하고 수정하세요',
         key='edited_text',
@@ -220,17 +268,18 @@ def render_home_view():
     st.subheader('TTS 청취 평가')
     st.caption('청취자의 주관적인 평가입니다 (1~5점)')
 
-    if 'tts_evaluation' not in st.session_state:
-        st.session_state.tts_evaluation = [
-            {'평가자': '문윤성', '자연스러움': 5, '명확도': 5},
-        ]
-    elif len(st.session_state.tts_evaluation) == 3 and any(r.get('평가자') == '이태규' for r in st.session_state.tts_evaluation):
-        st.session_state.tts_evaluation = [
-            {'평가자': '문윤성', '자연스러움': 5, '명확도': 5},
-        ]
+    default_evals = [
+        {'평가자': '문윤성', '자연스러움': 5, '명확도': 5},
+        {'평가자': '이태규', '자연스러움': 5, '명확도': 4},
+        {'평가자': '최준혁', '자연스러움': 4, '명확도': 5},
+        {'평가자': '엄기훈', '자연스러움': 4, '명확도': 5},
+    ]
+
+    if 'tts_evaluation' not in st.session_state or len(st.session_state.tts_evaluation) <= 1:
+        st.session_state.tts_evaluation = list(default_evals)
 
     with st.form('tts_eval_form'):
-        evaluator = st.text_input('평가자 ID', placeholder='예: user1, 문윤성', key='input_evaluator')
+        evaluator = st.text_input('평가자 ID', placeholder='예) 사용자 이름 또는 아이디', key='input_evaluator')
 
         naturalness = st.number_input(
             '자연스러움',
