@@ -165,7 +165,7 @@ def render_home_view():
 
     with tab2:
         wav_file = st.file_uploader(
-            'wav파일을 업로드하세요',
+            '음성 파일을 업로드하세요 (WAV, MP3)',
             type=['wav', 'mp3']
         )
 
@@ -281,8 +281,6 @@ def render_home_view():
         else:
             st.error(result['response'])
 
-    st.divider()
-
     voice_name = st.selectbox(
         '목소리 선택',
         list(VOICES.keys())
@@ -314,6 +312,23 @@ def render_home_view():
 
     st.divider()
 
+    # ─────────────────────────────────────────────────────────────
+    # TTS 생성 성능 (평가 상단으로 위치 이동)
+    # ─────────────────────────────────────────────────────────────
+    st.subheader("TTS 생성 성능")
+
+    stats = evaluate_tts()
+
+    c1, c2, c3 = st.columns(3)
+    c1.metric("생성 시도", f"{stats['total']}건")
+    c2.metric("평균 생성 시간", f"{stats['avg_elapsed_sec']:.2f}초")
+    c3.metric("실패율", f"{stats['failure_rate']:.1f}%")
+
+    st.divider()
+
+    # ─────────────────────────────────────────────────────────────
+    # TTS 청취 평가
+    # ─────────────────────────────────────────────────────────────
     st.subheader('TTS 청취 평가')
     st.caption('청취자의 주관적인 평가입니다 (1~5점)')
 
@@ -371,13 +386,3 @@ def render_home_view():
         m1.metric("평균 자연스러움", f"{df['자연스러움'].mean():.2f} / 5.0")
         m2.metric("평균 명료도", f"{df['명확도'].mean():.2f} / 5.0")
         st.dataframe(df, hide_index=True, use_container_width=True)
-
-    st.divider()
-    st.subheader("TTS 생성 성능")
-
-    stats = evaluate_tts()
-
-    c1, c2, c3 = st.columns(3)
-    c1.metric("생성 시도", f"{stats['total']}건")
-    c2.metric("평균 생성 시간", f"{stats['avg_elapsed_sec']:.2f}초")
-    c3.metric("실패율", f"{stats['failure_rate']:.1f}%")
