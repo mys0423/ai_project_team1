@@ -74,7 +74,12 @@ def fetch_history_records():
             db_runs = list_voice_runs(limit=100)
             if db_runs:
                 seen = {(str(r.get("transcript")), str(r.get("created_at"))[:19]) for r in records}
+                # [수정] home.py에서 넣은 세션 이력은 DB id를 가지고 있으므로 id로 먼저 중복 제거
+                #        (세션/DB 시각이 1초 이상 차이 나면 같은 이력이 두 번 보이던 문제)
+                seen_ids = {str(r.get("id")) for r in records if r.get("id")}
                 for r in db_runs:
+                    if str(r.get("id")) in seen_ids:
+                        continue
                     created = normalize_datetime(r.get("created_at"))
                     key = (str(r.get("transcript")), str(created)[:19])
                     if key not in seen:
@@ -144,7 +149,7 @@ def render_history_view():
                                   key="history_input_type")
     with col2:
         status = st.selectbox("처리 결과", ["전체", "성공", "실패"], key="history_status")
-
+        
     with col3:
         keyword = st.text_input("명령 검색", placeholder="검색할 문장을 입력하세요",
                                 key="history_keyword")
@@ -199,10 +204,10 @@ def render_history_view():
             st.write("입력 방식:", row.get("input_type", "직접 녹음"))
             st.write("입력·인식 문장:", row.get("transcript", ""))
             st.write("분류된 의도:", row.get("intent", ""))
-
+            
             resp = row.get("response_text") or row.get("response") or "응답 없음"
             st.write("시스템 응답:", resp)
-
+            
             latency = row.get("latency_ms") or 0
             if latency >= 1000:
                 st.write("처리 시간:", f"{latency / 1000:.2f}초")

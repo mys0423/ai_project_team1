@@ -6,7 +6,7 @@ from datetime import datetime
 import pandas as pd
 import streamlit as st
 from streamlit_calendar import calendar
-from src.core import process_text
+from src.core_test import process_text
 from src.stt import transcript_wav
 import time
 

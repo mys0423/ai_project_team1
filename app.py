@@ -1,6 +1,7 @@
-# app_home.py
+# app.py
 # 실행: python -m streamlit run app.py
 
+from pathlib import Path
 import streamlit as st
 
 # 페이지별 뷰 모듈 불러오기
@@ -9,8 +10,6 @@ from pages.memo import render_memo_view, init_memo_state
 from pages.todo import render_todo_view, init_task_state
 from pages.history import render_history_view, init_history_state
 from pages.model_evaluate import render_evaluate_view
-from assets.app_style_snippet import apply_common_style
-from src.db import has_database_url, get_connection
 
 # 0. 전역 페이지 설정
 st.set_page_config(
@@ -18,10 +17,14 @@ st.set_page_config(
     page_icon='🎙️',
     layout='centered'
 )
-apply_common_style()
 
-st.title('나만의 AI 음성 비서')
-
+# 전체 페이지 공통 스타일 적용
+css_path = Path(__file__).resolve().parent / "assets" / "style.css"
+if css_path.exists():
+    st.markdown(
+        f"<style>{css_path.read_text(encoding='utf-8')}</style>",
+        unsafe_allow_html=True
+    )
 
 
 # 1. 공통 세션 상태 초기화
@@ -32,9 +35,13 @@ if "stt_time" not in st.session_state:
 if "result" not in st.session_state:
     st.session_state.result = None
 
-init_memo_state()
-init_task_state()
-init_history_state()
+if "memos" not in st.session_state:
+    init_memo_state()
+if "tasks" not in st.session_state:
+    init_task_state()
+if "history" not in st.session_state:
+    init_history_state()
+
 
 # 2. 사이드바 메뉴 크기 시원하게 확대하는 CSS
 st.markdown("""
@@ -70,7 +77,7 @@ pages = [
     st.Page(render_memo_view, title="메모 관리", icon="📝"),
     st.Page(render_todo_view, title="할 일 관리", icon="📅"),
     st.Page(render_history_view, title="처리 이력", icon="📊"),
-    st.Page(render_evaluate_view, title='모델 평가', icon='📃')
+    st.Page(render_evaluate_view, title="모델 평가", icon="📈"),
 ]
 
 pg = st.navigation(pages)

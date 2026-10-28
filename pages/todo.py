@@ -5,10 +5,9 @@ from datetime import date, datetime, time, timedelta
 import uuid
 import streamlit as st
 
-from src.db import has_database_url, list_all_tasks, add_task as db_add_task, update_task as db_update_task, \
-    delete_task as db_delete_task
+from src.db import has_database_url, list_all_tasks, add_task as db_add_task, update_task as db_update_task, delete_task as db_delete_task
 
-PALETTE = ['#c7b8f5', '#b8e6c9', '#ffd9a8', '#f7c6d9', '#b8d8f7']  # 달력 칩 색상
+PALETTE = ['#c7b8f5', '#b8e6c9', '#ffd9a8', '#f7c6d9', '#b8d8f7']   # 달력 칩 색상
 DONE_COLOR = '#94A3B8'
 
 
@@ -49,14 +48,43 @@ def render_calendar(tasks, key='task_calendar'):
         'headerToolbar': {'left': 'prev,next today', 'center': 'title', 'right': ''},
         'displayEventTime': True,
     }
-    return full_cal(events=tasks_to_events(tasks), options=options, key=key)
+    custom_css = """
+    .fc {
+        background-color: #ffffff;
+        border-radius: 14px;
+        padding: 16px;
+        color: #252943;
+    }
+    .fc-theme-standard th {
+        background: #eef2ff !important;
+        color: #252943 !important;
+        font-weight: 600 !important;
+        padding: 8px 0 !important;
+    }
+    .fc-col-header-cell-cushion, .fc-daygrid-day-number {
+        color: #252943 !important;
+        text-decoration: none !important;
+    }
+    .fc-toolbar-title {
+        color: #252943 !important;
+        font-weight: 700 !important;
+    }
+    .fc-button-primary {
+        background-color: #7867ed !important;
+        border-color: #7867ed !important;
+    }
+    .fc-button-primary:hover {
+        background-color: #6654d9 !important;
+        border-color: #6654d9 !important;
+    }
+    """
+    return full_cal(events=tasks_to_events(tasks), options=options, custom_css=custom_css, key=key)
 
 
 def _demo_tasks():
     today = date.today()
     return [
-        {'id': 'demo-1', 'content': '발표 자료 준비', 'due_date': today - timedelta(days=1), 'due_time': None,
-         'is_done': False},
+        {'id': 'demo-1', 'content': '발표 자료 준비', 'due_date': today - timedelta(days=1), 'due_time': None, 'is_done': False},
         {'id': 'demo-2', 'content': '장보기', 'due_date': today, 'due_time': None, 'is_done': False},
         {'id': 'demo-3', 'content': '과제 제출', 'due_date': today + timedelta(days=3), 'due_time': None, 'is_done': False},
         {'id': 'demo-4', 'content': '회의 준비', 'due_date': today - timedelta(days=2), 'due_time': None, 'is_done': True},
@@ -64,35 +92,40 @@ def _demo_tasks():
     ]
 
 
-def init_task_state():
-    if "tasks" not in st.session_state:
-        # DB 연결 시 DB 데이터 우선 로드
-        if has_database_url():
-            try:
-                db_tasks = list_all_tasks(limit=100)
-                if db_tasks:
-                    loaded = []
-                    for row in db_tasks:
-                        d_val = row.get('due_date')
-                        if isinstance(d_val, str):
-                            try:
-                                d_val = date.fromisoformat(d_val)
-                            except Exception:
-                                d_val = None
-                        elif isinstance(d_val, datetime):
-                            d_val = d_val.date()
+def init_task_state(force=False):
+    # 이미 세션에 할 일이 로드되어 있으면 불필요한 원격 DB 반복 조회 방지 (속도 최적화)
+    if not force and "tasks" in st.session_state:
+        return
+    # DB 연결 시 항상 실제 DB 데이터와 동기화
+    if has_database_url():
+        try:
+            db_tasks = list_all_tasks(limit=100)
+            loaded = []
+            if db_tasks:
+                for row in db_tasks:
+                    d_val = row.get('due_date')
+                    if isinstance(d_val, str):
+                        try:
+                            d_val = date.fromisoformat(d_val)
+                        except Exception:
+                            d_val = None
+                    elif isinstance(d_val, datetime):
+                        d_val = d_val.date()
 
-                        loaded.append({
-                            'id': str(row.get('id')),
-                            'content': row.get('title') or '(제목 없음)',
-                            'due_date': d_val,
-                            'due_time': None,
-                            'is_done': bool(row.get('completed', False)),
-                        })
-                    st.session_state.tasks = loaded
-                    return
-            except Exception:
-                pass
+                    loaded.append({
+                        'id': str(row.get('id')),
+                        'content': row.get('title') or '(제목 없음)',
+                        'due_date': d_val,
+                        'due_time': None,
+                        'is_done': bool(row.get('completed', False)),
+                    })
+            st.session_state.tasks = loaded
+            return
+        except Exception:
+            pass
+
+    # DB 미연결 시에만 데모 데이터 사용
+    if "tasks" not in st.session_state:
         st.session_state.tasks = _demo_tasks()
 
 
@@ -111,7 +144,7 @@ def get_task_status_badge(due_date):
     """예정일 기준 상태 배지 반환 (기한 지남 / 오늘 / 예정)"""
     if not due_date:
         return '<span style="color: #94A3B8;">-</span>'
-
+    
     if isinstance(due_date, datetime):
         due_date = due_date.date()
 
@@ -189,8 +222,7 @@ def render_todo_view():
         # ─────────────────────────────────────────────────────────────
         # 1. 진행 중인 할 일 (해야 할 일)
         # ─────────────────────────────────────────────────────────────
-        st.markdown(f"#### ⏳ 해야 할 일 <span style='font-size: 0.9rem; color: #94A3B8;'>({len(pending_tasks)}건)</span>",
-                    unsafe_allow_html=True)
+        st.markdown(f"#### ⏳ 해야 할 일 <span style='font-size: 0.9rem; color: #94A3B8;'>({len(pending_tasks)}건)</span>", unsafe_allow_html=True)
         st.caption("아직 완료되지 않은 진행 중인 일정입니다.")
 
         if not pending_tasks:
@@ -210,24 +242,20 @@ def render_todo_view():
                 st.markdown("<div style='text-align: center; font-weight: bold;'>수정</div>", unsafe_allow_html=True)
             with h_c6:
                 st.markdown("<div style='text-align: center; font-weight: bold;'>삭제</div>", unsafe_allow_html=True)
-            st.markdown("<hr style='margin: 4px 0 12px 0; border: 0; border-top: 1px solid #334155;'>",
-                        unsafe_allow_html=True)
+            st.markdown("<hr style='margin: 4px 0 12px 0; border: 0; border-top: 1px solid #334155;'>", unsafe_allow_html=True)
 
             for original_idx, t in pending_tasks:
                 task_id = t.get('id', str(original_idx))
-                r_c1, r_c2, r_c3, r_c4, r_c5, r_c6 = st.columns([3.8, 1.8, 1.8, 1.3, 1.3, 1.3],
-                                                                vertical_alignment="center")
+                r_c1, r_c2, r_c3, r_c4, r_c5, r_c6 = st.columns([3.8, 1.8, 1.8, 1.3, 1.3, 1.3], vertical_alignment="center")
 
                 # 수정 모드 확인
                 is_editing = st.session_state.get(f"editing_task_{task_id}", False)
 
                 if is_editing:
                     with r_c1:
-                        edit_text = st.text_input("수정할 내용", value=t.get('content', ''), key=f"edit_txt_{task_id}",
-                                                  label_visibility="collapsed")
+                        edit_text = st.text_input("수정할 내용", value=t.get('content', ''), key=f"edit_txt_{task_id}", label_visibility="collapsed")
                     with r_c2:
-                        edit_due = st.date_input("수정할 날짜", value=t.get('due_date') or date.today(),
-                                                 key=f"edit_due_{task_id}", label_visibility="collapsed")
+                        edit_due = st.date_input("수정할 날짜", value=t.get('due_date') or date.today(), key=f"edit_due_{task_id}", label_visibility="collapsed")
                     with r_c3:
                         st.caption("수정 중")
                     with r_c4:
@@ -236,7 +264,9 @@ def render_todo_view():
                             t['due_date'] = edit_due
                             if has_database_url() and not str(task_id).startswith("demo-"):
                                 try:
-                                    db_update_task(data_id=task_id, due_date=edit_due, content=edit_text.strip())
+                                    # [수정] 목록·캘린더는 title 컬럼을 표시하므로 title도 함께 변경
+                                    db_update_task(data_id=task_id, due_date=edit_due,
+                                                   content=edit_text.strip(), title=edit_text.strip())
                                 except Exception:
                                     pass
                             st.session_state[f"editing_task_{task_id}"] = False
@@ -249,9 +279,7 @@ def render_todo_view():
                         st.write("")
                 else:
                     with r_c1:
-                        st.markdown(
-                            f"<span style='font-weight: 600; font-size: 0.98rem;'>{t.get('content', '')}</span>",
-                            unsafe_allow_html=True)
+                        st.markdown(f"<span style='font-weight: 600; font-size: 0.98rem;'>{t.get('content', '')}</span>", unsafe_allow_html=True)
                     with r_c2:
                         st.markdown(f"<span>{format_date_ko(t.get('due_date'))}</span>", unsafe_allow_html=True)
                     with r_c3:
@@ -276,11 +304,10 @@ def render_todo_view():
                                     db_delete_task(data_id=task_id)
                                 except Exception:
                                     pass
-                            st.session_state.tasks.pop(original_idx)
+                            st.session_state.tasks = [item for item in st.session_state.tasks if str(item.get('id')) != str(task_id)]
                             st.rerun()
 
-                st.markdown("<hr style='margin: 6px 0; border: 0; border-top: 1px solid rgba(255, 255, 255, 0.05);'>",
-                            unsafe_allow_html=True)
+                st.markdown("<hr style='margin: 6px 0; border: 0; border-top: 1px solid rgba(255, 255, 255, 0.05);'>", unsafe_allow_html=True)
 
         st.write("")
         st.write("")
@@ -288,8 +315,7 @@ def render_todo_view():
         # ─────────────────────────────────────────────────────────────
         # 2. 끝낸 일 (완료된 할 일)
         # ─────────────────────────────────────────────────────────────
-        st.markdown(f"#### ✅ 끝낸 일 <span style='font-size: 0.9rem; color: #94A3B8;'>({len(completed_tasks)}건)</span>",
-                    unsafe_allow_html=True)
+        st.markdown(f"#### ✅ 끝낸 일 <span style='font-size: 0.9rem; color: #94A3B8;'>({len(completed_tasks)}건)</span>", unsafe_allow_html=True)
         st.caption("완료된 일정입니다. 취소선으로 구분되어 표시됩니다.")
 
         if not completed_tasks:
@@ -307,8 +333,7 @@ def render_todo_view():
                 st.markdown("<div style='text-align: center; font-weight: bold;'>복원</div>", unsafe_allow_html=True)
             with h_d5:
                 st.markdown("<div style='text-align: center; font-weight: bold;'>삭제</div>", unsafe_allow_html=True)
-            st.markdown("<hr style='margin: 4px 0 12px 0; border: 0; border-top: 1px solid #334155;'>",
-                        unsafe_allow_html=True)
+            st.markdown("<hr style='margin: 4px 0 12px 0; border: 0; border-top: 1px solid #334155;'>", unsafe_allow_html=True)
 
             for original_idx, t in completed_tasks:
                 task_id = t.get('id', str(original_idx))
@@ -317,12 +342,9 @@ def render_todo_view():
                 with r_d1:
                     # 끝낸 일에는 일자로 선 그어주기 (취소선 line-through)
                     content_str = t.get('content', '')
-                    st.markdown(
-                        f"<span style='text-decoration: line-through; color: #94A3B8; font-size: 0.98rem;'>{content_str}</span>",
-                        unsafe_allow_html=True)
+                    st.markdown(f"<span style='text-decoration: line-through; color: #94A3B8; font-size: 0.98rem;'>{content_str}</span>", unsafe_allow_html=True)
                 with r_d2:
-                    st.markdown(f"<span style='color: #64748B;'>{format_date_ko(t.get('due_date'))}</span>",
-                                unsafe_allow_html=True)
+                    st.markdown(f"<span style='color: #64748B;'>{format_date_ko(t.get('due_date'))}</span>", unsafe_allow_html=True)
                 with r_d3:
                     st.markdown("<span style='color: #10B981; font-weight: 700;'>✅ 완료</span>", unsafe_allow_html=True)
                 with r_d4:
@@ -341,11 +363,10 @@ def render_todo_view():
                                 db_delete_task(data_id=task_id)
                             except Exception:
                                 pass
-                        st.session_state.tasks.pop(original_idx)
+                        st.session_state.tasks = [item for item in st.session_state.tasks if str(item.get('id')) != str(task_id)]
                         st.rerun()
 
-                st.markdown("<hr style='margin: 6px 0; border: 0; border-top: 1px solid rgba(255, 255, 255, 0.05);'>",
-                            unsafe_allow_html=True)
+                st.markdown("<hr style='margin: 6px 0; border: 0; border-top: 1px solid rgba(255, 255, 255, 0.05);'>", unsafe_allow_html=True)
 
 
 if __name__ == '__main__':

@@ -1,25 +1,29 @@
-# stt.py
-
+# src/stt.py
+import io
 import re
 import sys
 import time
 import unicodedata
 from functools import lru_cache
 from pathlib import Path
-from src.audio import *
+
 # 상위 폴더 경로 추가 (모듈 인식용)
 sys.path.append(str(Path(__file__).resolve().parent.parent))
+
 import soundfile as sf
 from faster_whisper import WhisperModel
 from jiwer import wer, cer
+
 from src.audio import preprocess
 
-# 모델 불러오기
+
+# 1. 모델 불러오기
 @lru_cache(maxsize=1)
 def load_stt_model(model_size="base"):
-    return WhisperModel(model_size, device="cpu", compute_type="int8")
+    return WhisperModel(model_size, device="cpu", compute_type="int8", cpu_threads=2)
 
-# 전사 처리
+
+# 2. 전사 처리
 def transcript_wav(audio, model_size="base"):
     start = time.perf_counter()
 
@@ -41,7 +45,7 @@ def transcript_wav(audio, model_size="base"):
     segments, info = model.transcribe(
         audio_data,
         language="ko",
-        beam_size=5,
+        beam_size=6,
         vad_filter=False,
         condition_on_previous_text=False,
         temperature=0
@@ -57,7 +61,8 @@ def transcript_wav(audio, model_size="base"):
 
     return text, elapsed
 
-# wer, cer 반환
+
+# 3. wer, cer 반환
 def evaluate_score(ref, pred):
     wer_score = wer(ref, pred)
     cer_score = cer(ref, pred)
@@ -65,4 +70,3 @@ def evaluate_score(ref, pred):
         "WER": round(wer_score, 4),
         "CER": round(cer_score, 4)
     }
-
