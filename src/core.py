@@ -86,9 +86,11 @@ def convert_date(date_text, today=None):
 
 def clean_title(value):
     value = value.strip(' ,，.!?')
-    value = re.sub(r'^(?:할\s*일(?:에|에서|중에|로)?|메모(?:에|장에)?)\s*', '', value)
+    value = re.sub(r'^(?:할\s*일(?:에|에서|중에|로|을|이)?|메모(?:에|장에)?)\s*', '', value)
     value = re.sub(r'^(?:에|를|을|은|는)\s+', '', value)
     value = re.sub(r'\s*(?:을|를|은|는|이|가|에|로|으로|까지)$', '', value)
+    value = re.sub(r'\s*(?:추가\s*(?:해줘|해달라|해주세요|해라|해|해주|하기|할래|좀)?|등록\s*(?:해줘|해달라|해주세요|해라|해|해주|하기|할래|좀)?|넣어\s*(?:줘|주세요|달라|라)?|추가|등록).*$', '', value)
+    value = re.sub(r'^(?:추가|등록|할\s*일)\s*', '', value)
     return value.strip(' ,，.!?')
 
 
@@ -162,23 +164,28 @@ def extract_slots(text, intent):
         return {k: v for k, v in slots.items() if v is not None}
 
     if intent == 'ADD_TASK':
+        action_verbs = r'(?:추가\s*(?:해줘|해주세요|해달라|해라|해|해주|하기|할래|좀)?|등록\s*(?:해줘|해주세요|해달라|해라|해|해주|하기|할래|좀)?|넣어\s*(?:줘|주세요|달라|라|줄래)?|추가|등록)'
         patterns = [
-            r'할\s*일(?:에|로)?\s*(.+?)\s*(?:추가해|넣어|등록해)',
+            rf'할\s*일(?:에|로|을)?\s*(.+?)\s*{action_verbs}',
+            rf'(.+?)\s*할\s*일(?:에|로|을)?\s*{action_verbs}',
+            rf'^(.+?)\s*{action_verbs}',
+            rf'할\s*일\s*(?:추가|등록)\s*[,，:\s]\s*(.+)$',
+            rf'^(?:추가|등록)\s*(.+)$',
             r'^(.+?)\s*(?:해야\s*돼|끝내야).*?(?:할\s*일에|등록해|넣어)',
-            r'^(.+?)\s*(?:할\s*일로\s*)?(?:등록해|추가해|넣어)',
-            r'^할\s*일\s*추가\s*[,，:]\s*(.+)$'
         ]
     elif intent == 'COMPLETE_TASK':
+        complete_verbs = r'(?:완료\s*(?:해줘|했어|처리|됐어|로)?|끝\s*(?:났어|냈어|남)?|다\s*했어)'
         patterns = [
-            r'할\s*일\s*중에\s*(.+?)\s*(?:완료|끝)',
-            r'^(.+?)\s*(?:완료|끝났어|다\s*했어)',
-            r'^(.+?)\s*(?:완료로|완료\s*처리)'
+            rf'할\s*일\s*중에\s*(.+?)\s*{complete_verbs}',
+            rf'^(.+?)\s*{complete_verbs}',
+            rf'(.+?)\s*할\s*일\s*{complete_verbs}'
         ]
     elif intent == 'DELETE_TASK':
+        delete_verbs = r'(?:지워\s*(?:줘)?|삭제\s*(?:해줘|해)?|빼\s*(?:줘)?)'
         patterns = [
-            r'할\s*일에서\s*(.+?)\s*(?:지워|삭제|빼)',
-            r'^(.+?)\s*할\s*일\s*(?:삭제|지워)',
-            r'^(.+?)\s*(?:안\s*해도\s*돼|삭제|지워|빼)'
+            rf'할\s*일에서\s*(.+?)\s*{delete_verbs}',
+            rf'^(.+?)\s*할\s*일\s*{delete_verbs}',
+            rf'^(.+?)\s*{delete_verbs}'
         ]
     else:
         patterns = []
@@ -204,6 +211,21 @@ def predict_intent(text):
     else:
         score = float(model.decision_function([text]).max())
         score_type = 'decision_score'
+
+    # 명확한 의도 키워드 기반 오분류 보정 (하이브리드 NLU)
+    add_kw = ['추가', '등록', '넣어']
+    complete_kw = ['완료', '다 했어', '끝났어', '끝냈어']
+    delete_kw = ['삭제', '지워', '빼줘', '빼']
+    list_kw = ['목록', '보여줘', '알려줘', '조회', '뭐 있어', '확인']
+
+    if any(k in text for k in add_kw) and not any(k in text for k in complete_kw + delete_kw + list_kw):
+        intent = 'ADD_MEMO' if '메모' in text else 'ADD_TASK'
+    elif any(k in text for k in complete_kw) and not any(k in text for k in add_kw + delete_kw):
+        intent = 'COMPLETE_TASK'
+    elif any(k in text for k in delete_kw) and not any(k in text for k in add_kw + complete_kw):
+        intent = 'DELETE_MEMO' if '메모' in text else 'DELETE_TASK'
+    elif any(k in text for k in list_kw) and not any(k in text for k in add_kw + complete_kw + delete_kw):
+        intent = 'LIST_MEMO' if '메모' in text else 'LIST_TASK'
 
     slots = extract_slots(text, intent)
     needs_confirm = (
@@ -273,8 +295,17 @@ def execute(intent, slots):
         if not title:
             return '추가할 할 일의 제목을 말씀해주세요', None
 
+        # 중복 체크: 동일한 제목과 마감일을 가진 미완료 할 일이 이미 있는지 확인
+        existing_tasks = list_all_tasks()
+        for t in existing_tasks:
+            if not t.get('completed') and t.get('title', '').strip() == title.strip():
+                t_due = str(t.get('due_date')) if t.get('due_date') else None
+                new_due = str(due_date) if due_date else None
+                if t_due == new_due:
+                    return f'이미 등록된 할 일입니다: {title}', {'id': str(t['id']), 'already_exists': True}
+
         task_id = add_task(title, title, due_date)
-        return f'할 일: {title}을 추가했습니다', {'id': str(task_id)}
+        return f'할 일: {title}을(를) 추가했습니다', {'id': str(task_id)}
 
     if intent == 'LIST_TASK':
         tasks = list_all_tasks()
@@ -288,9 +319,9 @@ def execute(intent, slots):
             tasks = [row for row in tasks if not row.get('completed')]
         if not tasks:
             return '조회된 할 일이 없습니다', []
-        lines = [f"{row['title']} ({'완료' if row.get('completed') else '미완료'}, "
-                 f"마감: {row.get('due_date') or '미지정'})" for row in tasks]
-        return '\n'.join(lines), tasks
+        lines = [f"{i}. {row['title']} ({'완료' if row.get('completed') else '미완료'}, 마감: {row.get('due_date') or '미지정'})"
+                 for i, row in enumerate(tasks, start=1)]
+        return '\n\n'.join(lines), tasks
 
     if intent in ('UPDATE_TASK', 'COMPLETE_TASK', 'DELETE_TASK'):
         if not title:
@@ -351,6 +382,12 @@ def execute(intent, slots):
         if not content:
             return '메모 내용을 입력해주세요', None
 
+        # 중복 체크: 동일한 내용의 메모가 이미 있는지 확인
+        existing_memos = list_memo(limit=50)
+        for m in existing_memos:
+            if m.get('content', '').strip() == content.strip():
+                return f'이미 저장된 메모입니다: {content}', {'id': str(m['id']), 'already_exists': True}
+
         memo_id = add_memo(content)
         return '메모를 저장했습니다', {'id': str(memo_id)}
 
@@ -366,7 +403,8 @@ def execute(intent, slots):
         if intent == 'LIST_MEMO':
             if not memos:
                 return '조회할 메모가 없습니다', []
-            return '\n'.join(f"- {row['content']}" for row in memos), memos
+            lines = [f"{i}. {row['content']}" for i, row in enumerate(memos, start=1)]
+            return '\n\n'.join(lines), memos
 
         row, error = select_one(memos, '메모')
         if error:

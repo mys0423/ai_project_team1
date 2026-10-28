@@ -2,8 +2,30 @@
 # 처리 이력 페이지 (음성 명령 및 AI 처리 로그)
 
 from datetime import date, datetime
+from zoneinfo import ZoneInfo
 import pandas as pd
 import streamlit as st
+
+from src.db import has_database_url, list_voice_runs
+
+
+def normalize_datetime(dt_val):
+    """타임존 충돌 방지: timezone-aware 객체는 한국 시간(KST)으로 변환 후 naive datetime으로 정규화"""
+    if dt_val is None or pd.isna(dt_val):
+        return datetime.now()
+    if isinstance(dt_val, str):
+        try:
+            dt_val = pd.to_datetime(dt_val)
+        except Exception:
+            return datetime.now()
+    if hasattr(dt_val, "tzinfo") and dt_val.tzinfo is not None:
+        try:
+            return dt_val.astimezone(ZoneInfo("Asia/Seoul")).replace(tzinfo=None)
+        except Exception:
+            return dt_val.tz_localize(None) if hasattr(dt_val, "tz_localize") else dt_val
+    if hasattr(dt_val, "to_pydatetime"):
+        return dt_val.to_pydatetime()
+    return dt_val
 
 
 def init_history_state():
@@ -42,30 +64,83 @@ def init_history_state():
         ]
 
 
+def fetch_history_records():
+    """DB에 저장된 이력이 있으면 세션과 병합하여 반환"""
+    init_history_state()
+    records = list(st.session_state.history)
+
+    if has_database_url():
+        try:
+            db_runs = list_voice_runs(limit=100)
+            if db_runs:
+                seen = {(str(r.get("transcript")), str(r.get("created_at"))[:19]) for r in records}
+                for r in db_runs:
+                    created = normalize_datetime(r.get("created_at"))
+                    key = (str(r.get("transcript")), str(created)[:19])
+                    if key not in seen:
+                        seen.add(key)
+                        records.append({
+                            "created_at": created,
+                            "input_type": r.get("input_type") or "직접 녹음",
+                            "transcript": r.get("transcript") or "(내용 없음)",
+                            "intent": r.get("intent") or "UNKNOWN",
+                            "status": r.get("status") or "실패",
+                            "response_text": r.get("response_text") or "",
+                            "latency_ms": float(r.get("latency_ms") or 0),
+                            "error_message": r.get("error_message") or "",
+                        })
+        except Exception:
+            pass
+
+    return records
+
+
 def render_history_view():
     init_history_state()
 
-    st.subheader('처리 이력')
+    st.subheader('🕒 처리 이력')
     st.caption("음성·텍스트 명령의 실행 결과를 확인하세요.")
 
-    if not st.session_state.history:
+    history_records = fetch_history_records()
+    if not history_records:
         st.info("기록된 음성 처리 이력이 없습니다.")
         return
 
-    df = pd.DataFrame(st.session_state.history)
-    df["created_at"] = pd.to_datetime(df["created_at"])
+    df = pd.DataFrame(history_records)
+
+    # 1) 필수 컬럼 기본값 보장 (KeyError 방지)
+    required_defaults = {
+        "created_at": datetime.now(),
+        "input_type": "직접 녹음",
+        "transcript": "(내용 없음)",
+        "intent": "UNKNOWN",
+        "status": "성공",
+        "response_text": "",
+        "latency_ms": 0.0,
+        "error_message": "",
+    }
+    for col, default_val in required_defaults.items():
+        if col not in df.columns:
+            df[col] = default_val
+        else:
+            df[col] = df[col].fillna(default_val)
+
+    # 2) 일시 컬럼 datetime 변환 (정규화된 naive datetime)
+    df["created_at"] = pd.to_datetime(df["created_at"].apply(normalize_datetime))
 
     # ── 1. 검색 · 필터 ─────────────────────────────────────────────
+    min_date = df["created_at"].min().date() if not df.empty else date.today()
+    max_date = max(df["created_at"].max().date(), date.today()) if not df.empty else date.today()
+
     col1, col2 = st.columns(2)
     with col1:
-        start_date = st.date_input("시작일", value=df["created_at"].min().date(),
-                                   key="history_start")
+        start_date = st.date_input("시작일", value=min_date, key="history_start")
     with col2:
-        end_date = st.date_input("종료일", value=date.today(), key="history_end")
+        end_date = st.date_input("종료일", value=max_date, key="history_end")
 
     col1, col2, col3 = st.columns([1, 1, 2])
     with col1:
-        input_type = st.selectbox("입력 방식", ["전체", "텍스트", "직접 녹음", "파일 업로드"],
+        input_type = st.selectbox("입력 방식", ["전체", "직접 녹음", "텍스트", "파일 업로드"],
                                   key="history_input_type")
     with col2:
         status = st.selectbox("처리 결과", ["전체", "성공", "실패"], key="history_status")
@@ -110,22 +185,33 @@ def render_history_view():
     view = filtered[["created_at", "input_type", "transcript", "intent", "status"]].copy()
     view["created_at"] = view["created_at"].dt.strftime("%m/%d %H:%M")
     view.columns = ["실행 시간", "입력 방식", "명령 문장", "의도", "결과"]
-    st.dataframe(view, hide_index=True, width="stretch")
+    st.dataframe(view, hide_index=True, use_container_width=True)
 
     # ── 4. 상세 보기 ──────────────────────────────────────────────
     st.subheader("기록 상세 보기")
     for row in filtered.to_dict("records"):
-        icon = "🟢" if row["status"] == "성공" else "🔴"
-        title = f"{icon} {row['created_at'].strftime('%m/%d %H:%M')} · {row['transcript']}"
+        icon = "🟢" if row.get("status") == "성공" else "🔴"
+        created_dt = row.get("created_at")
+        time_str = created_dt.strftime('%m/%d %H:%M') if hasattr(created_dt, 'strftime') else str(created_dt)[:16]
+        title = f"{icon} {time_str} · {row.get('transcript', '')}"
 
         with st.expander(title):
-            st.write("입력 방식:", row["input_type"])
-            st.write("입력·인식 문장:", row["transcript"])
-            st.write("분류된 의도", row["intent"])
-            st.write("시스템 응답:", row["response_text"])
-            st.write("처리 시간:", f"{row['latency_ms'] / 1000:.2f}초")
-            if row["error_message"]:
-                st.error(row["error_message"])
+            st.write("입력 방식:", row.get("input_type", "직접 녹음"))
+            st.write("입력·인식 문장:", row.get("transcript", ""))
+            st.write("분류된 의도:", row.get("intent", ""))
+
+            resp = row.get("response_text") or row.get("response") or "응답 없음"
+            st.write("시스템 응답:", resp)
+
+            latency = row.get("latency_ms") or 0
+            if latency >= 1000:
+                st.write("처리 시간:", f"{latency / 1000:.2f}초")
+            else:
+                st.write("처리 시간:", f"{latency:.0f}ms")
+
+            err = row.get("error_message")
+            if err:
+                st.error(err)
 
 
 if __name__ == '__main__':
