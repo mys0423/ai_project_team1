@@ -1,31 +1,41 @@
 # tests/test_stt_beam.py
 # Beam Size별 Whisper STT 전사 성능(WER, CER, Latency, RTF) 평가 스크립트
 
+import io
 from pathlib import Path
+import sys
 import time
+
 import pandas as pd
+import soundfile as sf
 from faster_whisper import WhisperModel
 from jiwer import wer, cer
 
+# 프로젝트 루트 경로 등록
 BASE_DIR = Path(__file__).resolve().parent.parent
+if str(BASE_DIR) not in sys.path:
+    sys.path.insert(0, str(BASE_DIR))
+
+from src.audio import preprocess
+
 AUDIO_DIR = Path(__file__).resolve().parent / "stt_test"
 REPORT_DIR = BASE_DIR / "reports"
 REPORT_DIR.mkdir(exist_ok=True)
 
-# 파일명과 실제 녹음한 문장
+# 파일명과 실제 녹음한 문장 (데이터셋 commands_RE.csv / intent_train_900.csv 기반 표준 정답 및 오타 수정 반영)
 REFERENCES = {
-    "ADD_MEMO.wav": "다음발표주제는 음성인식이라고 적어줘",
-    "ADD_TASK1.wav": "오늘할일에 장보기 추가해줘",
-    "ADD_TASK2.wav": "과제 제출을 다음주 월요일 할일로 등록해주세요",
-    "LIST_MEMO.wav": "그저께 쓴 메모 알려줘",
-    "LIST_TASK.wav": "완료한 할일목록 읽어줘",
-    "LIST_TASK2.wav": "끝난 할일 목록 읽어줘",
-    "T00_ADD_MEMO.wav": "메모에 우유사기라고 적어줘",
-    "T01_ADD_MEMO.wav": "장보기 목록 메모해줘",
-    "T02_ADD_MEMO.wav": "회의 준비라고 메모해줘",
-    "T03_LIST_MEMO.wav": "저장된 메모 보여줘",
-    "T04_ADD_TASK.wav": "오늘 할일에 운도 추가해줘",
-    "T05_LIST_TASK.wav": "내일 할일 알려줘",
+    "ADD_MEMO.wav": "다음 발표 주제는 음성 인식이라고 적어 줘",
+    "ADD_TASK1.wav": "오늘 할 일에 장보기 추가해 줘",
+    "ADD_TASK2.wav": "과제 제출을 다음 주 월요일 할 일로 등록해 주세요",
+    "LIST_MEMO.wav": "그저께 쓴 메모 알려 줘",
+    "LIST_TASK.wav": "완료한 할 일 목록 읽어 줘",
+    "LIST_TASK2.wav": "끝난 할 일 목록 읽어 줘",
+    "T00_ADD_MEMO.wav": "메모에 우유 사기라고 적어 줘",
+    "T01_ADD_MEMO.wav": "장보기 목록 메모해 줘",
+    "T02_ADD_MEMO.wav": "회의 준비라고 메모해 줘",
+    "T03_LIST_MEMO.wav": "저장된 메모 보여 줘",
+    "T04_ADD_TASK.wav": "오늘 할 일에 운동 추가해 줘",  # '운도' 오타 -> '운동' 정상 수정
+    "T05_LIST_TASK.wav": "내일 할 일 알려 줘",
 }
 
 
@@ -51,8 +61,13 @@ def main():
 
             start = time.perf_counter()
 
-            segments, info = model.transcribe(
-                str(path),
+            # 오디오 전처리 (PyAV 에러 방지 및 16kHz Mono Float32 변환)
+            raw_bytes = path.read_bytes()
+            prep_bytes, info = preprocess(raw_bytes, check_duplicate=False)
+            audio_data, _ = sf.read(io.BytesIO(prep_bytes), dtype="float32")
+
+            segments, transcribe_info = model.transcribe(
+                audio_data,
                 language="ko",
                 beam_size=beam_size,
                 vad_filter=True,
@@ -69,7 +84,7 @@ def main():
             ).strip()
 
             latency = time.perf_counter() - start
-            duration = info.duration
+            duration = transcribe_info.duration
 
             result = {
                 "beam_size": beam_size,
@@ -128,4 +143,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

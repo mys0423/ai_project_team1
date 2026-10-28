@@ -114,7 +114,7 @@ def init_task_state(force=False):
 
                     loaded.append({
                         'id': str(row.get('id')),
-                        'content': row.get('title') or '(제목 없음)',
+                        'content': row.get('content') or row.get('title') or '(제목 없음)',
                         'due_date': d_val,
                         'due_time': None,
                         'is_done': bool(row.get('completed', False)),
@@ -133,6 +133,11 @@ def format_date_ko(d):
     """날짜를 'M월 D일' 형태로 포맷"""
     if not d:
         return "-"
+    if isinstance(d, str):
+        try:
+            d = date.fromisoformat(d)
+        except Exception:
+            return str(d)
     if isinstance(d, datetime):
         d = d.date()
     if isinstance(d, date):
@@ -145,8 +150,15 @@ def get_task_status_badge(due_date):
     if not due_date:
         return '<span style="color: #94A3B8;">-</span>'
     
-    if isinstance(due_date, datetime):
+    if isinstance(due_date, str):
+        try:
+            due_date = date.fromisoformat(due_date)
+        except Exception:
+            return '<span style="color: #94A3B8;">-</span>'
+    elif isinstance(due_date, datetime):
         due_date = due_date.date()
+    elif not isinstance(due_date, date):
+        return '<span style="color: #94A3B8;">-</span>'
 
     today = date.today()
     if due_date < today:

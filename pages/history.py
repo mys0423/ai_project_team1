@@ -64,35 +64,32 @@ def init_history_state():
         ]
 
 
+STATUS_KO = {"success": "성공", "fail": "실패", "need_confirm": "확인 필요",
+             "성공": "성공", "실패": "실패", "확인 필요": "확인 필요"}
+
+
 def fetch_history_records():
-    """DB에 저장된 이력이 있으면 세션과 병합하여 반환"""
-    init_history_state()
-    records = list(st.session_state.history)
+    """DB 연결 시 voice_runs만 사용 (세션 이력과 섞지 않음), 없으면 예시 이력"""
+    if not has_database_url():
+        init_history_state()
+        return list(st.session_state.history)
 
-    if has_database_url():
-        try:
-            db_runs = list_voice_runs(limit=100)
-            if db_runs:
-                seen = {(str(r.get("transcript")), str(r.get("created_at"))[:19]) for r in records}
-                for r in db_runs:
-                    created = normalize_datetime(r.get("created_at"))
-                    key = (str(r.get("transcript")), str(created)[:19])
-                    if key not in seen:
-                        seen.add(key)
-                        records.append({
-                            "created_at": created,
-                            "input_type": r.get("input_type") or "직접 녹음",
-                            "transcript": r.get("transcript") or "(내용 없음)",
-                            "intent": r.get("intent") or "UNKNOWN",
-                            "status": r.get("status") or "실패",
-                            "response_text": r.get("response_text") or "",
-                            "latency_ms": float(r.get("latency_ms") or 0),
-                            "error_message": r.get("error_message") or "",
-                        })
-        except Exception:
-            pass
+    try:
+        db_runs = list_voice_runs(limit=500)
+    except Exception as e:
+        st.error(f"처리 이력을 불러오지 못했습니다: {type(e).__name__}")
+        return []
 
-    return records
+    return [{
+        "created_at": normalize_datetime(r.get("created_at")),
+        "input_type": r.get("input_type") or "-",
+        "transcript": r.get("transcript") or "(내용 없음)",
+        "intent": r.get("intent") or "UNKNOWN",
+        "status": STATUS_KO.get(r.get("status"), "실패"),
+        "response_text": r.get("response_text") or "",
+        "latency_ms": float(r.get("latency_ms") or 0),
+        "error_message": r.get("error_message") or "",
+    } for r in db_runs]
 
 
 def render_history_view():

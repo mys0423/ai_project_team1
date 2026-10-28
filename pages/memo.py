@@ -5,6 +5,7 @@
 # DB는 아직 연결하지 않았고, 예시 메모를 st.session_state에 보관합니다.
 import uuid
 from datetime import date, datetime, timedelta
+from zoneinfo import ZoneInfo
 
 import streamlit as st
 from src.db import has_database_url, list_memo, add_memo as db_add_memo, update_memo as db_update_memo, delete_memo as db_delete_memo
@@ -12,6 +13,23 @@ from src.db import has_database_url, list_memo, add_memo as db_add_memo, update_
 WEEKDAYS = "월화수목금토일"
 COLS = 2            # 한 줄에 놓을 카드 수
 PREVIEW_LEN = 40    # 카드에 보여 줄 글자 수
+
+
+def normalize_datetime(dt_val):
+    """타임존 충돌 방지: timezone-aware 객체는 한국 시간(KST)으로 변환 후 naive datetime으로 정규화"""
+    if dt_val is None:
+        return datetime.now()
+    if isinstance(dt_val, str):
+        try:
+            dt_val = datetime.fromisoformat(dt_val)
+        except Exception:
+            return datetime.now()
+    if hasattr(dt_val, "tzinfo") and dt_val.tzinfo is not None:
+        try:
+            return dt_val.astimezone(ZoneInfo("Asia/Seoul")).replace(tzinfo=None)
+        except Exception:
+            return dt_val.replace(tzinfo=None)
+    return dt_val
 
 
 # ---------------------------------------------------------------------------
@@ -28,14 +46,7 @@ def init_memo_state(force=False):
             loaded = []
             if db_memos:
                 for row in db_memos:
-                    c_val = row.get('created_at')
-                    if isinstance(c_val, str):
-                        try:
-                            c_val = datetime.fromisoformat(c_val)
-                        except Exception:
-                            c_val = datetime.now()
-                    elif not isinstance(c_val, datetime):
-                        c_val = datetime.now()
+                    c_val = normalize_datetime(row.get('created_at'))
 
                     loaded.append({
                         "id": str(row.get('id')),
@@ -248,8 +259,11 @@ def render_memo_view():
     if not memos:
         st.info("메모가 없습니다. 위에서 새 메모를 추가해 보세요.")
 
+    for m in memos:
+        m["created_at"] = normalize_datetime(m.get("created_at"))
+
     groups = {}
-    for m in sorted(memos, key=lambda x: x["created_at"], reverse=True):
+    for m in sorted(memos, key=lambda x: normalize_datetime(x.get("created_at")), reverse=True):
         groups.setdefault(m["created_at"].date(), []).append(m)
 
     for d, items in groups.items():
