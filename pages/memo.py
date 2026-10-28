@@ -199,7 +199,7 @@ def open_memo(memo):
 # 화면 렌더링 함수
 # ---------------------------------------------------------------------------
 def render_memo_view():
-    init_memo_state()
+    init_memo_state(force=True)
 
     pending = st.session_state.pop("pending_toast", None)
     if pending:
