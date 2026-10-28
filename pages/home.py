@@ -12,7 +12,7 @@ from src.tts import text_to_speech, VOICES, evaluate_tts
 
 
 def handle_process_text(text: str, input_type: str = "직접 녹음"):
-    result = core_process_text(text)
+    result = core_process_text(text, input_type=input_type)
     intent = result.get('intent', 'UNKNOWN')
     slots = result.get('slots', {})
     status = result.get('status', '실패')
@@ -64,7 +64,7 @@ def handle_process_text(text: str, input_type: str = "직접 녹음"):
                     due_date = date.today()
 
                 task_id = result.get('data', {}).get('id') if isinstance(result.get('data'), dict) else str(uuid.uuid4())
-                st.session_state.tasks.append({
+                st.session_state.tasks.insert(0, {
                     'id': str(task_id),
                     'content': title,
                     'due_date': due_date,
@@ -158,6 +158,7 @@ def render_home_view():
         st.session_state.clear_edited_text = False
 
     with st.expander('📌 사용 가능한 명령어 예시'):
+        st.caption('예시에 맞게 문장을 수정하세요')
         st.info('예시에 맞게 문장을 수정하세요')
         st.markdown("""
         **📅 할 일 관리**
@@ -220,12 +221,13 @@ def render_home_view():
         if not text:
             st.warning('음성녹음/텍스트 입력, 파일업로드를 먼저 해주세요')
         else:
-            input_type = st.session_state.get('current_input_type', '직접 녹음')
+            input_type = st.session_state.get('current_input_type', '텍스트')
             with st.spinner('AI 의도 분석 및 등록 중...'):
                 result = handle_process_text(text, input_type=input_type)
             st.session_state.result = result
             st.session_state.clear_edited_text = True
             st.session_state.last_tts_audio = None
+            st.session_state.current_input_type = '텍스트'
             st.rerun()
 
     if st.session_state.result is not None:
@@ -235,10 +237,8 @@ def render_home_view():
         else:
             st.error(result['response'])
 
-    st.divider()
-
     voice_name = st.selectbox(
-        '목소리 선택',
+        '원하는 목소리를 선택하세요',
         list(VOICES.keys())
     )
 
@@ -249,14 +249,17 @@ def render_home_view():
             st.warning('작업을 먼저 실행해주세요')
         else:
             with st.spinner('음성 생성 중...'):
-                t0 = time.perf_counter()
-                audio_bytes = text_to_speech(
-                    st.session_state.result['response'],
-                    voice=voice
-                )
-                tts_sec = time.perf_counter() - t0
-                st.session_state.last_tts_audio = audio_bytes
-                st.session_state.last_tts_sec = tts_sec
+                try:
+                    t0 = time.perf_counter()
+                    audio_bytes = text_to_speech(
+                        st.session_state.result['response'],
+                        voice=voice
+                    )
+                    tts_sec = time.perf_counter() - t0
+                    st.session_state.last_tts_audio = audio_bytes
+                    st.session_state.last_tts_sec = tts_sec
+                except Exception as e:
+                    st.error(f'음성 생성에 실패했습니다: {e}')
 
     if st.session_state.get('last_tts_audio'):
         st.audio(st.session_state.last_tts_audio, format="audio/mp3")
@@ -265,6 +268,23 @@ def render_home_view():
 
     st.divider()
 
+    # ─────────────────────────────────────────────────────────────
+    # TTS 생성 성능 (평가 상단으로 위치 이동)
+    # ─────────────────────────────────────────────────────────────
+    st.subheader("TTS 생성 성능")
+
+    stats = evaluate_tts()
+
+    c1, c2, c3 = st.columns(3)
+    c1.metric("생성 시도", f"{stats['total']}건")
+    c2.metric("평균 생성 시간", f"{stats['avg_elapsed_sec']:.2f}초")
+    c3.metric("실패율", f"{stats['failure_rate']:.1f}%")
+
+    st.divider()
+
+    # ─────────────────────────────────────────────────────────────
+    # TTS 청취 평가
+    # ─────────────────────────────────────────────────────────────
     st.subheader('TTS 청취 평가')
     st.caption('청취자의 주관적인 평가입니다 (1~5점)')
 
@@ -322,13 +342,3 @@ def render_home_view():
         m1.metric("평균 자연스러움", f"{df['자연스러움'].mean():.2f} / 5.0")
         m2.metric("평균 명료도", f"{df['명확도'].mean():.2f} / 5.0")
         st.dataframe(df, hide_index=True, use_container_width=True)
-
-    st.divider()
-    st.subheader("TTS 생성 성능")
-
-    stats = evaluate_tts()
-
-    c1, c2, c3 = st.columns(3)
-    c1.metric("생성 시도", f"{stats['total']}건")
-    c2.metric("평균 생성 시간", f"{stats['avg_elapsed_sec']:.2f}초")
-    c3.metric("실패율", f"{stats['failure_rate']:.1f}%")

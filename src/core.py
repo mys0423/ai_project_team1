@@ -88,7 +88,7 @@ def clean_title(value):
     value = value.strip(' ,，.!?')
     value = re.sub(r'^(?:할\s*일(?:에|에서|중에|로|을|이)?|메모(?:에|장에)?)\s*', '', value)
     value = re.sub(r'^(?:에|를|을|은|는)\s+', '', value)
-    value = re.sub(r'\s*(?:을|를|은|는|이|가|에|로|으로|까지)$', '', value)
+    value = re.sub(r'\s*(?:을|를|은|는|이|가|에|로|으로|까지|이라고|라고|메모장에|메모에|메모장|메모)$', '', value)
     value = re.sub(r'\s*(?:추가\s*(?:해줘|해달라|해주세요|해라|해|해주|하기|할래|좀)?|등록\s*(?:해줘|해달라|해주세요|해라|해|해주|하기|할래|좀)?|넣어\s*(?:줘|주세요|달라|라)?|추가|등록).*$', '', value)
     value = re.sub(r'^(?:추가|등록|할\s*일)\s*', '', value)
     return value.strip(' ,，.!?')
@@ -134,18 +134,25 @@ def extract_slots(text, intent):
         return {k: v for k, v in slots.items() if v is not None}
 
     if intent == 'ADD_MEMO':
+        memo_raw = text.strip()
         patterns = [
             r'^(.+?)\s*이라고\s*(?:메모|적어)',
             r'^메모\s*추가\s*[,，:]\s*(.+)$',
-            r'^(?:메모장|메모)(?:에)?\s*(.+?)\s*(?:남겨|적어|써)',
-            r'^(.+?)\s*[,，]?\s*메모해',
-            r'^(.+?)\s*메모(?:해|로\s*남겨|에\s*적어)'
+            r'^(?:메모장|메모)(?:에)?\s*(.+?)\s*(?:남겨|적어|써|추가)',
+            r'^(.+?)\s*[,，]?\s*메모(?:해|로\s*남겨|에\s*적어|해줘|해달라|하기)?$',
+            r'^(.+?)\s*(?:적어|남겨|써)\s*(?:줘|달라|라)?$'
         ]
         for pattern in patterns:
-            m = re.search(pattern, working)
+            m = re.search(pattern, memo_raw)
             if m:
-                slots['MEMO_CONTENT'] = clean_title(m.group(1))
-                break
+                content = clean_title(m.group(1))
+                if content:
+                    slots['MEMO_CONTENT'] = content
+                    break
+        if 'MEMO_CONTENT' not in slots:
+            fallback = re.sub(r'\s*(?:이라고\s*)?메모\s*(?:해줘|해|로\s*남겨|에\s*적어|추가|등록)?.*$', '', memo_raw)
+            clean_fb = clean_title(fallback)
+            slots['MEMO_CONTENT'] = clean_fb if clean_fb else memo_raw
         return slots
 
     if intent == 'UPDATE_TASK':
@@ -181,7 +188,7 @@ def extract_slots(text, intent):
             rf'(.+?)\s*할\s*일\s*{complete_verbs}'
         ]
     elif intent == 'DELETE_TASK':
-        delete_verbs = r'(?:지워\s*(?:줘)?|삭제\s*(?:해줘|해)?|빼\s*(?:줘)?)'
+        delete_verbs = r'(?:지워\s*(?:줘|달라|라)?|삭제\s*(?:해줘|해|달라)?|빼\s*(?:줘|달라)?|취소\s*(?:해줘|해|달라)?)'
         patterns = [
             rf'할\s*일에서\s*(.+?)\s*{delete_verbs}',
             rf'^(.+?)\s*할\s*일\s*{delete_verbs}',
@@ -213,19 +220,36 @@ def predict_intent(text):
         score_type = 'decision_score'
 
     # 명확한 의도 키워드 기반 오분류 보정 (하이브리드 NLU)
+    help_kw = ['도움말', '명령어', '사용법', '어떻게 써', '어떻게 사용', '기능 알려줘']
     add_kw = ['추가', '등록', '넣어']
     complete_kw = ['완료', '다 했어', '끝났어', '끝냈어']
-    delete_kw = ['삭제', '지워', '빼줘', '빼']
-    list_kw = ['목록', '보여줘', '알려줘', '조회', '뭐 있어', '확인']
+    delete_kw = ['삭제', '지워', '빼줘', '빼', '취소해줘', '취소']
+    update_kw = ['변경', '바꿔', '미뤄', '옮겨', '수정']
+    list_kw = ['목록', '보여줘', '알려줘', '조회', '뭐 있어', '확인', '리스트']
 
-    if any(k in text for k in add_kw) and not any(k in text for k in complete_kw + delete_kw + list_kw):
-        intent = 'ADD_MEMO' if '메모' in text else 'ADD_TASK'
-    elif any(k in text for k in complete_kw) and not any(k in text for k in add_kw + delete_kw):
-        intent = 'COMPLETE_TASK'
-    elif any(k in text for k in delete_kw) and not any(k in text for k in add_kw + complete_kw):
-        intent = 'DELETE_MEMO' if '메모' in text else 'DELETE_TASK'
-    elif any(k in text for k in list_kw) and not any(k in text for k in add_kw + complete_kw + delete_kw):
-        intent = 'LIST_MEMO' if '메모' in text else 'LIST_TASK'
+    # 0) 도움말 관련 발화 우선 보정
+    if any(k in text for k in help_kw):
+        intent = 'HELP'
+    # 1) 메모 관련 발화 명시적 보정
+    elif '메모' in text:
+        if any(k in text for k in delete_kw):
+            intent = 'DELETE_MEMO'
+        elif any(k in text for k in list_kw):
+            intent = 'LIST_MEMO'
+        elif any(k in text for k in ['메모해', '메모로', '적어', '남겨', '써', '추가', '등록', '넣어']) or text.strip().endswith(('메모', '메모해줘', '메모해')):
+            intent = 'ADD_MEMO'
+    # 2) 일반 일정 및 할 일 관련 보정
+    else:
+        if any(k in text for k in list_kw) and not any(k in text for k in add_kw + update_kw):
+            intent = 'LIST_TASK'
+        elif any(k in text for k in update_kw) and not any(k in text for k in add_kw + delete_kw):
+            intent = 'UPDATE_TASK'
+        elif any(k in text for k in complete_kw) and not any(k in text for k in add_kw + delete_kw + list_kw):
+            intent = 'COMPLETE_TASK'
+        elif any(k in text for k in delete_kw) and not any(k in text for k in add_kw + complete_kw + list_kw):
+            intent = 'DELETE_TASK'
+        elif any(k in text for k in add_kw) and not any(k in text for k in complete_kw + delete_kw + list_kw):
+            intent = 'ADD_TASK'
 
     slots = extract_slots(text, intent)
     needs_confirm = (
@@ -253,9 +277,9 @@ HELP_TEXT = (
 # 할 일 전체 조회 및 검색
 def task_matches(title, due_date=None):
     rows = list_all_tasks()
-    matches = [row for row in rows if row.get('title') == title]
+    matches = [row for row in rows if row.get('title') == title or row.get('content') == title]
     if not matches and title:
-        matches = [row for row in rows if title in row.get('title', '')]
+        matches = [row for row in rows if (row.get('title') and title in row['title']) or (row.get('content') and title in row['content'])]
 
     if due_date:
         matches = [row for row in matches if row.get('due_date') and
@@ -424,7 +448,7 @@ def init_db():
         create_table()
 
 
-def process_text(text):
+def process_text(text, input_type=None):
     init_db()
     t0 = time.perf_counter()
     result = predict_intent(text)
@@ -450,7 +474,8 @@ def process_text(text):
                 status=status,
                 response_text=response,
                 latency_ms=elapsed_ms,
-                error_message=None if status == '성공' else response
+                error_message=None if status == '성공' else response,
+                input_type=input_type
             )
     except Exception:
         pass
@@ -461,7 +486,8 @@ def process_text(text):
         'response': response,
         'data': data,
         'status': status,
-        'latency_ms': elapsed_ms
+        'latency_ms': elapsed_ms,
+        'input_type': input_type
     }
 
 

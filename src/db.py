@@ -120,11 +120,13 @@ def delete_task(data_id):
             return cur.rowcount
 
 # 음성 명령 처리 이력 입력
-def add_voice_runs(transcript, intent, status, response_text=None, latency_ms=None, error_message=None):
+def add_voice_runs(transcript, intent, status, response_text=None, latency_ms=None, error_message=None,
+                   input_type=None):  # [수정] input_type 인자 추가
     sql = load_sql('add_voice_run.sql')
     with get_connection() as conn:
         with conn.cursor() as cur:
-            cur.execute(sql, (transcript, intent, status, response_text, latency_ms, error_message))
+            cur.execute(sql, (transcript, intent, status, response_text, latency_ms, error_message,
+                              input_type))  # [수정] input_type 전달
             return cur.fetchone()[0]
 
 # 음성 명령 처리 이력 조회
