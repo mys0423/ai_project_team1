@@ -299,7 +299,7 @@ def render_todo_view():
                                     db_delete_task(data_id=task_id)
                                 except Exception:
                                     pass
-                            st.session_state.tasks.pop(original_idx)
+                            st.session_state.tasks = [item for item in st.session_state.tasks if str(item.get('id')) != str(task_id)]
                             st.rerun()
 
                 st.markdown("<hr style='margin: 6px 0; border: 0; border-top: 1px solid rgba(255, 255, 255, 0.05);'>", unsafe_allow_html=True)
@@ -358,7 +358,7 @@ def render_todo_view():
                                 db_delete_task(data_id=task_id)
                             except Exception:
                                 pass
-                        st.session_state.tasks.pop(original_idx)
+                        st.session_state.tasks = [item for item in st.session_state.tasks if str(item.get('id')) != str(task_id)]
                         st.rerun()
 
                 st.markdown("<hr style='margin: 6px 0; border: 0; border-top: 1px solid rgba(255, 255, 255, 0.05);'>", unsafe_allow_html=True)

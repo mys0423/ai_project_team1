@@ -5,9 +5,10 @@ import time
 import uuid
 from datetime import date, datetime
 import streamlit as st
+import pandas as pd
 from src.stt import transcript_wav
 from src.core import process_text as core_process_text
-from src.tts import text_to_speech, VOICES
+from src.tts import text_to_speech, VOICES, evaluate_tts
 
 
 def handle_process_text(text: str, input_type: str = "직접 녹음"):
@@ -176,6 +177,7 @@ def render_home_view():
                 result = handle_process_text(text, input_type=input_type)
             st.session_state.result = result
             st.session_state.clear_edited_text = True
+            st.session_state.last_tts_audio = None
             st.rerun()
 
     if st.session_state.result is not None:
@@ -205,6 +207,79 @@ def render_home_view():
                     voice=voice
                 )
                 tts_sec = time.perf_counter() - t0
+                st.session_state.last_tts_audio = audio_bytes
+                st.session_state.last_tts_sec = tts_sec
 
-            st.audio(audio_bytes, format="audio/mp3", autoplay=True)
-            st.caption(f"⚡ TTS 소요 시간: {tts_sec:.3f}초")
+    if st.session_state.get('last_tts_audio'):
+        st.audio(st.session_state.last_tts_audio, format="audio/mp3")
+        if st.session_state.get('last_tts_sec'):
+            st.caption(f"⚡ TTS 소요 시간: {st.session_state.last_tts_sec:.3f}초")
+
+    st.divider()
+
+    st.subheader('TTS 청취 평가')
+    st.caption('청취자의 주관적인 평가입니다 (1~5점)')
+
+    if 'tts_evaluation' not in st.session_state:
+        st.session_state.tts_evaluation = [
+            {'평가자': '문윤성', '자연스러움': 5, '명확도': 5},
+        ]
+    elif len(st.session_state.tts_evaluation) == 3 and any(r.get('평가자') == '이태규' for r in st.session_state.tts_evaluation):
+        st.session_state.tts_evaluation = [
+            {'평가자': '문윤성', '자연스러움': 5, '명확도': 5},
+        ]
+
+    with st.form('tts_eval_form'):
+        evaluator = st.text_input('평가자 ID', placeholder='예: user1, 문윤성', key='input_evaluator')
+
+        naturalness = st.number_input(
+            '자연스러움',
+            min_value=1,
+            max_value=5,
+            step=1,
+            value=3
+        )
+
+        clarity = st.number_input(
+            '명확도',
+            min_value=1,
+            max_value=5,
+            step=1,
+            value=3
+        )
+        submitted = st.form_submit_button('평가 저장', type='primary')
+
+        if submitted:
+            evaluator = evaluator.strip()
+
+            if not evaluator:
+                st.warning('평가자의 ID를 입력해주세요')
+            elif any(row['평가자'] == evaluator for row in st.session_state.tts_evaluation):
+                st.warning('이미 평가한 ID 입니다')
+            else:
+                st.session_state.tts_evaluation.append({
+                    '평가자': evaluator,
+                    '자연스러움': naturalness,
+                    '명확도': clarity
+                })
+                st.success('평가를 성공적으로 저장했습니다')
+
+    evaluation = st.session_state.tts_evaluation
+
+    if len(evaluation) >= 1:
+        st.write(f'👥 청취 평가 참여자 수: {len(evaluation)}명')
+        df = pd.DataFrame(evaluation)
+        m1, m2 = st.columns(2)
+        m1.metric("평균 자연스러움", f"{df['자연스러움'].mean():.2f} / 5.0")
+        m2.metric("평균 명료도", f"{df['명확도'].mean():.2f} / 5.0")
+        st.dataframe(df, hide_index=True, use_container_width=True)
+
+    st.divider()
+    st.subheader("TTS 생성 성능")
+
+    stats = evaluate_tts()
+
+    c1, c2, c3 = st.columns(3)
+    c1.metric("생성 시도", f"{stats['total']}건")
+    c2.metric("평균 생성 시간", f"{stats['avg_elapsed_sec']:.2f}초")
+    c3.metric("실패율", f"{stats['failure_rate']:.1f}%")

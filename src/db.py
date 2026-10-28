@@ -95,6 +95,14 @@ def update_task(data_id, due_date=None, content=None, completed=None):
             cur.execute(sql, (due_date, content, completed, data_id))
             return cur.rowcount
 
+# 메모 수정
+def update_memo(data_id, content):
+    sql = load_sql('update_memo.sql')
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(sql, (content, data_id))
+            return cur.rowcount
+
 # 메모 삭제
 def delete_memo(data_id):
     sql = load_sql('delete_memo.sql')

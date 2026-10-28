@@ -7,6 +7,7 @@ import uuid
 from datetime import date, datetime, timedelta
 
 import streamlit as st
+from src.db import has_database_url, list_memo, add_memo as db_add_memo, update_memo as db_update_memo, delete_memo as db_delete_memo
 
 WEEKDAYS = "월화수목금토일"
 COLS = 2            # 한 줄에 놓을 카드 수
@@ -14,9 +15,36 @@ PREVIEW_LEN = 40    # 카드에 보여 줄 글자 수
 
 
 # ---------------------------------------------------------------------------
-# 예시 데이터 초기화
+# 데이터 초기화 및 DB 동기화
 # ---------------------------------------------------------------------------
 def init_memo_state():
+    # DB 연결 시 항상 실제 DB 데이터와 실시간 동기화
+    if has_database_url():
+        try:
+            db_memos = list_memo(limit=100)
+            loaded = []
+            if db_memos:
+                for row in db_memos:
+                    c_val = row.get('created_at')
+                    if isinstance(c_val, str):
+                        try:
+                            c_val = datetime.fromisoformat(c_val)
+                        except Exception:
+                            c_val = datetime.now()
+                    elif not isinstance(c_val, datetime):
+                        c_val = datetime.now()
+
+                    loaded.append({
+                        "id": str(row.get('id')),
+                        "content": row.get('content') or '',
+                        "created_at": c_val
+                    })
+            st.session_state.memos = loaded
+            return
+        except Exception:
+            pass
+
+    # DB 미연결 시에만 예시 샘플 표시
     if "memos" not in st.session_state:
         now = datetime.now().replace(second=0, microsecond=0)
         today = now.replace(hour=0, minute=0)
@@ -33,7 +61,7 @@ def init_memo_state():
             ("우유랑 계란 사기", at(3, 10, 20)),
         ]
         st.session_state.memos = [
-            {"id": str(uuid.uuid4()), "content": c, "created_at": t} for c, t in samples
+            {"id": f"sample-{uuid.uuid4()}", "content": c, "created_at": t} for c, t in samples
         ]
 
 
@@ -44,16 +72,33 @@ def add_memo():
     text = st.session_state.new_memo.strip()
     if not text:
         return
-    st.session_state.memos.append(
-        {"id": str(uuid.uuid4()), "content": text, "created_at": datetime.now()}
+
+    memo_id = str(uuid.uuid4())
+    if has_database_url():
+        try:
+            saved_id = db_add_memo(text)
+            if saved_id:
+                memo_id = str(saved_id)
+        except Exception:
+            pass
+
+    st.session_state.memos.insert(
+        0, {"id": memo_id, "content": text, "created_at": datetime.now()}
     )
     st.session_state.new_memo = ""
     st.toast("메모를 저장했습니다.", icon="✅")
 
 
 def delete_memo(memo_id):
+    if has_database_url() and not str(memo_id).startswith("sample-"):
+        try:
+            db_delete_memo(memo_id)
+        except Exception:
+            pass
+
     st.session_state.memos = [m for m in st.session_state.memos if m["id"] != memo_id]
     st.toast("메모를 삭제했습니다.", icon="🗑️")
+
 
 def update_memo(memo_id, new_content):
     edit_key = f"edit_content_{memo_id}"
@@ -70,9 +115,12 @@ def update_memo(memo_id, new_content):
             if m['content'] == new_content:  # 바뀐 내용이 없으면 조용히 종료
                 return
             m['content'] = new_content
+            if has_database_url() and not str(memo_id).startswith("sample-"):
+                try:
+                    db_update_memo(data_id=memo_id, content=new_content)
+                except Exception:
+                    pass
             st.session_state.pop(edit_key, None)  # 카드 입력칸이 새 내용으로 다시 채워지도록
-            # st.toast를 바로 부르면 팝업의 st.rerun()에 지워지므로,
-            # 메시지를 맡겨 두고 render_memo_view()가 다시 그려질 때 한 번만 띄웁니다
             st.session_state.pending_toast = ('메모를 수정했습니다', '✏️')
             return
 
@@ -106,27 +154,26 @@ def open_memo(memo):
     if left.button("삭제", icon=":material/delete:", use_container_width=True):
         delete_memo(memo["id"])
         st.rerun()
-    if middle.button('수정', icon="✏️", use_container_width=True, key=f'correction_{memo['id']}'):
+    if middle.button('수정', icon="✏️", use_container_width=True, key=f"correction_{memo['id']}"):
         st.session_state[f'editing_{memo["id"]}'] = True
     if st.session_state.get(f'editing_{memo["id"]}', False):
         new_content = st.text_input(
             '수정할 내용',
             value=memo['content'],
-            key=f'edit_{memo["id"]}'
+            key=f'dialog_edit_{memo["id"]}'
         )
         col1, col2 = st.columns(2)
 
         with col1:
-            if st.button('저장', key=f'save_{memo["id"]}', type="tertiary"):
+            if st.button('저장', key=f'dialog_save_{memo["id"]}', type="tertiary"):
                 if new_content.strip():
                     update_memo(memo['id'], new_content)
-
                     st.session_state[f'editing_{memo["id"]}'] = False
                     st.rerun()
                 else:
                     st.warning('수정할 내용을 입력해주세요')
         with col2:
-            if st.button('취소', key=f'cancel_{memo["id"]}', type="tertiary"):
+            if st.button('취소', key=f'dialog_cancel_{memo["id"]}', type="tertiary"):
                 st.session_state[f'editing_{memo["id"]}'] = False
                 st.rerun()
     if right.button("닫기", type="primary", use_container_width=True):
@@ -218,9 +265,9 @@ def render_memo_view():
                         left, right = st.columns(2)
                         with left:
                             if st.button("", icon=":material/edit:", type="tertiary",
-                                      key=f"update_{memo['id']}", help="메모 수정",
-                                      on_click=update_memo, args=(memo["id"], memo["content"],)):
+                                      key=f"update_{memo['id']}", help="메모 수정"):
                                 st.session_state[f'editing_{memo["id"]}'] = True
+                                st.rerun()
                         with right:
                             st.button("", icon=":material/delete:", key=f"del_{memo['id']}",
                                     type="tertiary", help="삭제",
@@ -229,12 +276,12 @@ def render_memo_view():
                         new_content = st.text_input(
                             '수정할 내용',
                             value=memo['content'],
-                            key=f'edit_{memo["id"]}'
+                            key=f'card_edit_{memo["id"]}'
                         )
                         col1, col2 = st.columns(2)
 
                         with col1:
-                            if st.button('저장', key=f'save_{memo["id"]}', type="tertiary"):
+                            if st.button('저장', key=f'card_save_{memo["id"]}', type="tertiary"):
                                 if new_content.strip():
                                     update_memo(memo['id'], new_content)
                                     st.session_state[f'editing_{memo["id"]}'] = False
@@ -242,7 +289,7 @@ def render_memo_view():
                                 else:
                                     st.warning('수정할 내용을 입력해주세요')
                         with col2:
-                            if st.button('취소', key=f'cancel_{memo["id"]}', type="tertiary"):
+                            if st.button('취소', key=f'card_cancel_{memo["id"]}', type="tertiary"):
                                 st.session_state[f'editing_{memo["id"]}'] = False
                                 st.rerun()
 
