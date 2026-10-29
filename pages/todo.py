@@ -114,7 +114,7 @@ def init_task_state(force=False):
 
                     loaded.append({
                         'id': str(row.get('id')),
-                        'content': row.get('content') or row.get('title') or '(제목 없음)',
+                        'content': row.get('title') or '(제목 없음)',
                         'due_date': d_val,
                         'due_time': None,
                         'is_done': bool(row.get('completed', False)),
@@ -146,7 +146,7 @@ def format_date_ko(d):
 
 
 def get_task_status_badge(due_date):
-    """예정일 기준 상태 배지 반환 (기한 지남 / 오늘 / 예정)"""
+    """할 일 상태 뱃지 반환 (기한 초과 / 오늘 / 예정)"""
     if not due_date:
         return '<span style="color: #94A3B8;">-</span>'
     
@@ -170,7 +170,7 @@ def get_task_status_badge(due_date):
 
 
 def render_todo_view():
-    init_task_state()
+    init_task_state(force=True)
 
     st.subheader('할 일 관리(업무 관리)')
 
@@ -276,7 +276,9 @@ def render_todo_view():
                             t['due_date'] = edit_due
                             if has_database_url() and not str(task_id).startswith("demo-"):
                                 try:
-                                    db_update_task(data_id=task_id, due_date=edit_due, content=edit_text.strip())
+                                    # [수정] 목록·캘린더는 title 컬럼을 표시하므로 title도 함께 변경
+                                    db_update_task(data_id=task_id, due_date=edit_due,
+                                                   content=edit_text.strip(), title=edit_text.strip())
                                 except Exception:
                                     pass
                             st.session_state[f"editing_task_{task_id}"] = False

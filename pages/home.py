@@ -9,10 +9,34 @@ import pandas as pd
 from src.stt import transcript_wav
 from src.core import process_text as core_process_text
 from src.tts import text_to_speech, VOICES, evaluate_tts
+from src.db import has_database_url
+from pages.todo import init_task_state
+from pages.memo import init_memo_state
+
+
+TASK_INTENTS = {'ADD_TASK', 'UPDATE_TASK', 'COMPLETE_TASK', 'DELETE_TASK'}
+MEMO_INTENTS = {'ADD_MEMO', 'DELETE_MEMO'}
+
+
+def _sync_from_db(intent):
+    """[수정] 처리 성공 시 DB 기준으로 세션 목록을 다시 불러옴
+    - 기존: 제목 '포함' 여부로 세션을 직접 수정 → 같은 이름(날짜만 다른) 할 일/메모가 모두 삭제·완료되어 보임
+    - 변경: DB에서 실제로 바뀐 결과만 반영 (메모/할 일 페이지와 항상 일치)
+    """
+    if not has_database_url():
+        return False
+    try:
+        if intent in TASK_INTENTS:
+            init_task_state(force=True)
+        elif intent in MEMO_INTENTS:
+            init_memo_state(force=True)
+        return True
+    except Exception:
+        return False
 
 
 def handle_process_text(text: str, input_type: str = "직접 녹음"):
-    result = core_process_text(text, input_type=input_type)
+    result = core_process_text(text, input_type=input_type)  # [수정] 입력 방식을 처리 이력에 전달
     intent = result.get('intent', 'UNKNOWN')
     slots = result.get('slots', {})
     status = result.get('status', '실패')
@@ -24,6 +48,7 @@ def handle_process_text(text: str, input_type: str = "직접 녹음"):
         st.session_state.history = []
 
     st.session_state.history.insert(0, {
+        "id": result.get('run_id'),  # [수정] 처리 이력 페이지에서 DB 이력과 중복 표시 방지
         "transcript": text,
         "input_type": input_type,
         "intent": intent,
@@ -36,7 +61,8 @@ def handle_process_text(text: str, input_type: str = "직접 녹음"):
     })
 
     # 2. 메모 / 할 일 세션 상태 동기화 (성공 시)
-    if status == '성공':
+    #    [수정] DB가 연결되어 있으면 DB 결과로 다시 불러오고, 아니면 core가 돌려준 id 기준으로만 반영
+    if status == '성공' and not _sync_from_db(intent):
         if "memos" not in st.session_state:
             st.session_state.memos = []
         if "tasks" not in st.session_state:
@@ -64,7 +90,7 @@ def handle_process_text(text: str, input_type: str = "직접 녹음"):
                     due_date = date.today()
 
                 task_id = result.get('data', {}).get('id') if isinstance(result.get('data'), dict) else str(uuid.uuid4())
-                st.session_state.tasks.insert(0, {
+                st.session_state.tasks.append({
                     'id': str(task_id),
                     'content': title,
                     'due_date': due_date,
@@ -72,20 +98,30 @@ def handle_process_text(text: str, input_type: str = "직접 녹음"):
                     'is_done': False
                 })
 
-        elif intent == 'COMPLETE_TASK':
-            title = slots.get('TITLE', '')
+        # [수정] 제목 '포함' 비교 대신 실제 처리된 id만 반영 (같은 이름의 다른 날짜 항목은 건드리지 않음)
+        data = result.get('data') if isinstance(result.get('data'), dict) else {}
+        target_ids = {str(i) for i in (data.get('ids') or ([data['id']] if data.get('id') else []))}
+
+        if intent == 'COMPLETE_TASK':
             for t in st.session_state.tasks:
-                if title in t.get('content', ''):
+                if str(t.get('id')) in target_ids:
                     t['is_done'] = True
 
+        elif intent == 'UPDATE_TASK':
+            new_title = slots.get('NEW_TITLE')
+            new_due = slots.get('NEW_DUE_DATE')
+            for t in st.session_state.tasks:
+                if str(t.get('id')) in target_ids:
+                    if new_title:
+                        t['content'] = new_title
+                    if new_due:
+                        t['due_date'] = date.fromisoformat(new_due)
+
         elif intent == 'DELETE_TASK':
-            title = slots.get('TITLE', '')
-            st.session_state.tasks = [t for t in st.session_state.tasks if title not in t.get('content', '')]
+            st.session_state.tasks = [t for t in st.session_state.tasks if str(t.get('id')) not in target_ids]
 
         elif intent == 'DELETE_MEMO':
-            keyword = slots.get('KEYWORD', '')
-            if keyword:
-                st.session_state.memos = [m for m in st.session_state.memos if keyword not in m.get('content', '')]
+            st.session_state.memos = [m for m in st.session_state.memos if str(m.get('id')) not in target_ids]
 
     return result
 
@@ -129,7 +165,7 @@ def render_home_view():
 
     with tab2:
         wav_file = st.file_uploader(
-            'wav파일을 업로드하세요',
+            '음성 파일을 업로드하세요 (WAV, MP3)',
             type=['wav', 'mp3']
         )
 
@@ -158,7 +194,6 @@ def render_home_view():
         st.session_state.clear_edited_text = False
 
     with st.expander('📌 사용 가능한 명령어 예시'):
-        st.caption('예시에 맞게 문장을 수정하세요')
         st.info('예시에 맞게 문장을 수정하세요')
         st.markdown("""
         **📅 할 일 관리**
@@ -166,26 +201,30 @@ def render_home_view():
         **1. 할 일 추가**
         - 할 일에 장보기 추가해
         - 내일 회의 등록해
+        - 29일 할 일에 발표 준비 추가해
         - 할 일 추가: 운동하기
 
         **2. 할 일 조회**
         - 오늘 할 일 알려줘
+        - 30일 할 일 알려줘
         - 내일 미완료 할 일 보여줘
         - 완료한 할 일 보여줘
 
         **3. 할 일 수정**
         - 장보기 이름을 마트 가기로 바꿔
         - 회의 날짜를 내일로 변경해
+        - 30일 운동 날짜를 31일로 바꿔 (같은 이름이 여러 날짜에 있으면 날짜를 앞에)
 
         **4. 할 일 완료**
         - 장보기 완료
-        - 운동 다 했어
+        - 30일 운동 다 했어
         - 할 일 중에 회의 완료
+        - 운동 모두 완료 (같은 이름 전체)
 
         **5. 할 일 삭제**
         - 할 일에서 장보기 삭제
-        - 운동 할 일 지워
-        - 장보기 삭제
+        - 29일 운동 할 일 지워
+        - 장보기 모두 삭제 (같은 이름 전체)
 
         ---
 
@@ -203,7 +242,9 @@ def render_home_view():
 
         **3. 메모 삭제**
         - 회의 관련 메모 삭제해
-        - 메모 삭제해
+        - 최근 메모 삭제해
+        - 회의 관련 메모 모두 삭제해
+        - 메모 삭제해 (삭제할 후보를 보여 드려요)
         """)
 
     edited_text = st.text_area(
@@ -234,11 +275,14 @@ def render_home_view():
         result = st.session_state.result
         if result['status'] == '성공':
             st.success(result['response'])
+        elif result.get('needs_input'):
+            # [수정] 중복·대상 없음 등 다시 말해야 하는 경우는 오류가 아닌 안내로 표시
+            st.warning(result['response'], icon='💬')
         else:
             st.error(result['response'])
 
     voice_name = st.selectbox(
-        '원하는 목소리를 선택하세요',
+        '목소리 선택',
         list(VOICES.keys())
     )
 

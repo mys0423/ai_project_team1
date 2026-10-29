@@ -65,7 +65,7 @@ def _trim_silence(y: np.ndarray, top_db: float = TOP_DB, frame_length: int = 204
 # 검사
 def validate_wav(audio):
     if not isinstance(audio, bytes) or not audio:
-        raise ValueError("비어 있지 않은 WAV bytes가 필요합니다.")
+        raise ValueError("비어 있지 않은 오디오 bytes가 필요합니다.")
     if len(audio) > MAX_BYTES:
         raise ValueError("녹음 파일은 10MB 이하여야 합니다.")
 
@@ -74,10 +74,10 @@ def validate_wav(audio):
     except Exception as exc:
         raise ValueError("WAV 파일을 읽을 수 없습니다.") from exc
 
-    if wav.format not in ("WAV", "WAVEX"):
-        raise ValueError("WAV 파일만 지원합니다.")
+    if wav.format not in ("WAV", "WAVEX", "MP3"):
+        raise ValueError("WAV 또는 MP3 파일만 지원합니다.")
     if wav.channels not in (1, 2) or wav.samplerate <= 0 or wav.frames <= 0:
-        raise ValueError("모노 또는 스테레오 WAV 파일이 필요합니다.")
+        raise ValueError("모노 또는 스테레오 오디오 파일이 필요합니다.")
 
     return {
         "hash_value": hashlib.sha256(audio).hexdigest(),
