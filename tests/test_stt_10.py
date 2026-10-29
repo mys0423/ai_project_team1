@@ -23,7 +23,7 @@ REFERENCES = {
     "T01_ADD_MEMO.wav": "장보기 목록 메모해줘",
     "T02_ADD_MEMO.wav": "회의 준비라고 메모해줘",
     "T03_LIST_MEMO.wav": "저장된 메모 보여줘",
-    "T04_ADD_TASK.wav": "오늘 할일에 운도 추가해줘",
+    "T04_ADD_TASK.wav": "오늘 할일에 운동 추가해줘",
     "T05_LIST_TASK.wav": "내일 할일 알려줘",
 }
 

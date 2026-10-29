@@ -133,26 +133,26 @@ def render_evaluate_view():
         with st.spinner('모델 학습 및 평가 중...'):
             train_model()
         st.success('모델 평가가 완료되었습니다')
-        st.rerun()
+        # st.rerun()
 
-    if metrics_path.exists():
-        df = pd.read_csv(metrics_path)
-        render_summary(df)                                          # 재현율 · F1 요약
-        st.subheader('의도별 평가 지표')
-        st.dataframe(df, width="stretch", hide_index=True)
-        render_per_intent_chart(df)                                 # 의도별 성능
+        if metrics_path.exists():
+            df = pd.read_csv(metrics_path)
+            render_summary(df)                                          # 재현율 · F1 요약
+            st.subheader('의도별 평가 지표')
+            st.dataframe(df, width="stretch", hide_index=True)
+            render_per_intent_chart(df)                                 # 의도별 성능
 
-        if errors_path.exists():
-            errors = pd.read_csv(errors_path)
-            st.subheader('대표 오류 사례')
-            if errors.empty:
-                st.info('오분류 사례가 없습니다')
-            else:
-                st.dataframe(errors, width="stretch", hide_index=True)
+            if errors_path.exists():
+                errors = pd.read_csv(errors_path)
+                st.subheader('대표 오류 사례')
+                if errors.empty:
+                    st.info('오분류 사례가 없습니다')
+                else:
+                    st.dataframe(errors, width="stretch", hide_index=True)
 
-            render_confusion_chart(df, errors)                     # 혼동 행렬 시각화
-    else:
-        st.info('아직 평가 결과가 없습니다. 위의 버튼을 눌러 모델 평가를 실행해 보세요.')
+                render_confusion_chart(df, errors)                     # 혼동 행렬 시각화
+        else:
+            st.info('아직 평가 결과가 없습니다. 위의 버튼을 눌러 모델 평가를 실행해 보세요.')
 
 if __name__ == '__main__':
     st.set_page_config(page_title="모델 평가", layout="centered")

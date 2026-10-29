@@ -64,6 +64,12 @@ def init_history_state():
         ]
 
 
+STATUS_KO = {
+    "success": "성공", "fail": "실패", "need_confirm": "확인 필요",
+    "성공": "성공", "실패": "실패", "확인 필요": "확인 필요"
+}
+
+
 def fetch_history_records():
     """DB에 저장된 이력이 있으면 세션과 병합하여 반환"""
     init_history_state()
@@ -89,7 +95,7 @@ def fetch_history_records():
                             "input_type": r.get("input_type") or "직접 녹음",
                             "transcript": r.get("transcript") or "(내용 없음)",
                             "intent": r.get("intent") or "UNKNOWN",
-                            "status": r.get("status") or "실패",
+                            "status": STATUS_KO.get(r.get("status"), r.get("status") or "실패"),
                             "response_text": r.get("response_text") or "",
                             "latency_ms": float(r.get("latency_ms") or 0),
                             "error_message": r.get("error_message") or "",
@@ -149,7 +155,7 @@ def render_history_view():
                                   key="history_input_type")
     with col2:
         status = st.selectbox("처리 결과", ["전체", "성공", "실패"], key="history_status")
-        
+
     with col3:
         keyword = st.text_input("명령 검색", placeholder="검색할 문장을 입력하세요",
                                 key="history_keyword")
@@ -204,10 +210,10 @@ def render_history_view():
             st.write("입력 방식:", row.get("input_type", "직접 녹음"))
             st.write("입력·인식 문장:", row.get("transcript", ""))
             st.write("분류된 의도:", row.get("intent", ""))
-            
+
             resp = row.get("response_text") or row.get("response") or "응답 없음"
             st.write("시스템 응답:", resp)
-            
+
             latency = row.get("latency_ms") or 0
             if latency >= 1000:
                 st.write("처리 시간:", f"{latency / 1000:.2f}초")
