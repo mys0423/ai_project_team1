@@ -121,38 +121,45 @@ def render_confusion_chart(metrics: pd.DataFrame, errors: pd.DataFrame):
 # 페이지 (기존 구성 유지 · [추가] 표시한 줄만 새로 넣음)
 # ════════════════════════════════════════════════════════════════════════════
 def render_evaluate_view():
-    st.subheader('📃 모델 평가')
+    st.subheader('📈 모델 평가')
+    st.caption('NLU 의도 분류 모델(LinearSVC)의 성능 평가 및 혼동 행렬을 확인합니다.')
 
     metrics_path = REPORT_PATH / 'intent_metrics.csv'
     errors_path = REPORT_PATH / 'intent_errors.csv'
 
-    has_report = metrics_path.exists()
-    btn_label = '모델 재학습 및 평가 실행' if has_report else '모델 학습 및 평가 실행'
+    if "model_evaluated" not in st.session_state:
+        st.session_state.model_evaluated = False
+
+    btn_label = '🔄 모델 재학습 및 평가 다시 실행' if st.session_state.model_evaluated else '🚀 모델 학습 및 평가 실행'
 
     if st.button(btn_label, type='primary'):
-        with st.spinner('모델 학습 및 평가 중...'):
+        with st.spinner('모델 학습 및 평가 진행 중...'):
             train_model()
-        st.success('모델 평가가 완료되었습니다')
+        st.session_state.model_evaluated = True
+        st.toast('모델 평가가 완료되었습니다!', icon='✨')
         st.rerun()
 
-    if metrics_path.exists():
-        df = pd.read_csv(metrics_path)
-        render_summary(df)                                          # 재현율 · F1 요약
-        st.subheader('의도별 평가 지표')
-        st.dataframe(df, width="stretch", hide_index=True)
-        render_per_intent_chart(df)                                 # 의도별 성능
+    if st.session_state.model_evaluated:
+        if metrics_path.exists():
+            df = pd.read_csv(metrics_path)
+            render_summary(df)                                          # 재현율 · F1 요약
+            st.subheader('의도별 평가 지표')
+            st.dataframe(df, width="stretch", hide_index=True)
+            render_per_intent_chart(df)                                 # 의도별 성능
 
-        if errors_path.exists():
-            errors = pd.read_csv(errors_path)
-            st.subheader('대표 오류 사례')
-            if errors.empty:
-                st.info('오분류 사례가 없습니다')
-            else:
-                st.dataframe(errors, width="stretch", hide_index=True)
+            if errors_path.exists():
+                errors = pd.read_csv(errors_path)
+                st.subheader('대표 오류 사례')
+                if errors.empty:
+                    st.info('오분류 사례가 없습니다')
+                else:
+                    st.dataframe(errors, width="stretch", hide_index=True)
 
-            render_confusion_chart(df, errors)                     # 혼동 행렬 시각화
+                render_confusion_chart(df, errors)                     # 혼동 행렬 시각화
+        else:
+            st.warning('평가 지표 파일을 불러올 수 없습니다. 다시 실행해 주세요.')
     else:
-        st.info('아직 평가 결과가 없습니다. 위의 버튼을 눌러 모델 평가를 실행해 보세요.')
+        st.info('👉 위의 **[🚀 모델 학습 및 평가 실행]** 버튼을 누르면 실시간으로 모델 학습과 성능 평가가 실행됩니다.')
 
 if __name__ == '__main__':
     st.set_page_config(page_title="모델 평가", layout="centered")
