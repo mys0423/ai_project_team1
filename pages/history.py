@@ -6,7 +6,7 @@ from zoneinfo import ZoneInfo
 import pandas as pd
 import streamlit as st
 
-from src.db import has_database_url, list_voice_runs
+from src.db import has_database_url, list_voice_runs, clear_voice_runs
 
 
 def normalize_datetime(dt_val):
@@ -78,8 +78,20 @@ def fetch_history_records():
 def render_history_view():
     init_history_state()
 
-    st.subheader('🕒 처리 이력')
-    st.caption("음성·텍스트 명령의 실행 결과를 확인하세요.")
+    col_h1, col_h2 = st.columns([3, 1])
+    with col_h1:
+        st.subheader('🕒 처리 이력')
+        st.caption("음성·텍스트 명령의 실행 결과를 확인하세요.")
+    with col_h2:
+        if st.button('🗑️ 이력 비우기', use_container_width=True, help='기록된 모든 처리 이력을 삭제합니다.'):
+            st.session_state.history = []
+            if has_database_url():
+                try:
+                    clear_voice_runs()
+                except Exception:
+                    pass
+            st.toast("모든 처리 이력이 삭제되었습니다.")
+            st.rerun()
 
     history_records = fetch_history_records()
     if not history_records:

@@ -136,3 +136,10 @@ def list_voice_runs(limit=100):
         with conn.cursor(row_factory=dict_row) as cur:
             cur.execute(sql, (limit,))
             return cur.fetchall()
+
+# 음성 명령 처리 이력 전체 삭제
+def clear_voice_runs():
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute("TRUNCATE TABLE voice_runs RESTART IDENTITY;")
+        conn.commit()
