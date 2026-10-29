@@ -40,39 +40,34 @@ STATUS_KO = {
 
 
 def fetch_history_records():
-    """DB에 저장된 이력이 있으면 세션과 병합하여 반환"""
+    """DB에 저장된 이력이 있으면 DB 데이터를 최우선으로 불러와 세션과 동기화하여 반환"""
     init_history_state()
-    records = list(st.session_state.history)
+    records = []
 
     if has_database_url():
         try:
             db_runs = list_voice_runs(limit=100)
             if db_runs:
-                seen = {(str(r.get("transcript")), str(r.get("created_at"))[:19]) for r in records}
-                # [수정] home.py에서 넣은 세션 이력은 DB id를 가지고 있으므로 id로 먼저 중복 제거
-                #        (세션/DB 시각이 1초 이상 차이 나면 같은 이력이 두 번 보이던 문제)
-                seen_ids = {str(r.get("id")) for r in records if r.get("id")}
                 for r in db_runs:
-                    if str(r.get("id")) in seen_ids:
-                        continue
                     created = normalize_datetime(r.get("created_at"))
-                    key = (str(r.get("transcript")), str(created)[:19])
-                    if key not in seen:
-                        seen.add(key)
-                        records.append({
-                            "created_at": created,
-                            "input_type": r.get("input_type") or "직접 녹음",
-                            "transcript": r.get("transcript") or "(내용 없음)",
-                            "intent": r.get("intent") or "UNKNOWN",
-                            "status": STATUS_KO.get(r.get("status"), r.get("status") or "실패"),
-                            "response_text": r.get("response_text") or "",
-                            "latency_ms": float(r.get("latency_ms") or 0),
-                            "error_message": r.get("error_message") or "",
-                        })
+                    records.append({
+                        "id": str(r.get("id")),
+                        "created_at": created,
+                        "input_type": r.get("input_type") or "직접 녹음",
+                        "transcript": r.get("transcript") or "(내용 없음)",
+                        "intent": r.get("intent") or "UNKNOWN",
+                        "status": STATUS_KO.get(r.get("status"), r.get("status") or "실패"),
+                        "response_text": r.get("response_text") or "",
+                        "latency_ms": float(r.get("latency_ms") or 0),
+                        "error_message": r.get("error_message") or "",
+                    })
+                st.session_state.history = records
+                return records
         except Exception:
             pass
 
-    return records
+    # DB 미연결 시 세션 메모리 이력 사용
+    return list(st.session_state.history)
 
 
 def render_history_view():
