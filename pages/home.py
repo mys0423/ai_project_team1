@@ -177,12 +177,20 @@ def render_home_view():
                 st.warning('파일을 먼저 업로드해주세요')
             else:
                 st.session_state.current_input_type = '파일 업로드'
-                with st.spinner('파일 분석 중...'):
-                    text, elapsed = transcript_wav(wav_file.getvalue())
-                st.session_state.edited_text = text
-                st.session_state.stt_time = elapsed
-                st.toast(f"전사 완료 ({elapsed}초)", icon="✨")
-                st.rerun()
+
+                # [수정] 무음 파일 업로드 안내
+                try:
+                    with st.spinner('파일 분석 중...'):
+                        text, elapsed = transcript_wav(wav_file.getvalue())
+                    if not text.strip():
+                        st.warning('무음 파일입니다. 파일을 다시 확인해주세요')
+                    else:
+                        st.session_state.edited_text = text
+                        st.session_state.stt_time = elapsed
+                        st.toast(f"전사 완료 ({elapsed}초)", icon="✨")
+                        st.rerun()
+                except ValueError as e:
+                    st.warning(str(e))
 
     st.divider()
 

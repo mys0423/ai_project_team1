@@ -82,14 +82,7 @@ def render_calendar(tasks, key='task_calendar'):
 
 
 def _demo_tasks():
-    today = date.today()
-    return [
-        {'id': 'demo-1', 'content': '발표 자료 준비', 'due_date': today - timedelta(days=1), 'due_time': None, 'is_done': False},
-        {'id': 'demo-2', 'content': '장보기', 'due_date': today, 'due_time': None, 'is_done': False},
-        {'id': 'demo-3', 'content': '과제 제출', 'due_date': today + timedelta(days=3), 'due_time': None, 'is_done': False},
-        {'id': 'demo-4', 'content': '회의 준비', 'due_date': today - timedelta(days=2), 'due_time': None, 'is_done': True},
-        {'id': 'demo-5', 'content': '책 반납', 'due_date': today - timedelta(days=3), 'due_time': None, 'is_done': True},
-    ]
+    return []
 
 
 def init_task_state(force=False):
@@ -126,7 +119,7 @@ def init_task_state(force=False):
 
     # DB 미연결 시에만 데모 데이터 사용
     if "tasks" not in st.session_state:
-        st.session_state.tasks = _demo_tasks()
+        st.session_state.tasks = []
 
 
 def format_date_ko(d):

@@ -214,17 +214,30 @@ def extract_slots(text, intent):
             if content:
                 slots['MEMO_CONTENT'] = content
                 return slots
+
+        memo_actions = r'(?:추가\s*(?:해줘|해주세요|해달라|해라|해|해주|하기|할래|좀)?|등록\s*(?:해줘|해주세요|해달라|해라|해|해주|하기|할래|좀)?|남겨\s*(?:줘|주세요|달라|라|둬|놓아)?|적어\s*(?:줘|주세요|달라|라|둬|놓아)?|써\s*(?:줘|주세요|달라|라|둬|놓아)?|해\s*(?:줘|주세요|둬|놓아|라)?|추가|등록)'
         patterns = [
-            r'^메모\s*추가\s*[,，:]\s*(.+)$',
-            r'^(?:메모장|메모)(?:에)?\s*(.+?)\s*(?:남겨|적어|써)',
-            r'^(.+?)\s*[,，]?\s*메모\s*(?:좀\s*)?해',
-            r'^(.+?)\s*메모(?:해|로\s*남겨|에\s*적어)'
+            # 1) 메모 추가: 회의 준비 / 메모 추가 회의준비 / 메모 등록 회의준비
+            rf'^(?:메모\s*추가|메모\s*등록)\s*[,，:]?\s*(.+)$',
+            # 2) 메모에 회의준비 추가해줘 / 메모장에 회의준비 적어줘
+            rf'^(?:메모장|메모)(?:에|로)?\s*(.+?)\s*{memo_actions}$',
+            # 3) 회의준비 메모 추가해줘 / 회의준비 메모 등록
+            rf'^(.+?)\s*(?:메모장|메모)(?:에|로|를|을)?\s*{memo_actions}$',
+            # 4) 회의준비 메모해 / 우유 사기 메모
+            rf'^(.+?)\s*[,，]?\s*메모\s*(?:좀\s*)?해',
+            rf'^(.+?)\s*메모(?:해|로\s*남겨|에\s*적어)',
+            # 5) "회의준비 메모" 처럼 입력된 경우
+            rf'^(.+?)\s*메모$',
+            # 6) 메모 회의준비
+            rf'^메모\s+(.+)$',
         ]
         for pattern in patterns:
             m = re.search(pattern, working)
             if m:
-                slots['MEMO_CONTENT'] = clean_title(m.group(1))
-                break
+                extracted = clean_title(m.group(1))
+                if extracted:
+                    slots['MEMO_CONTENT'] = extracted
+                    break
         return slots
 
     if intent == 'UPDATE_TASK':
@@ -305,6 +318,10 @@ def predict_intent(text):
         intent = 'ADD_MEMO'
     elif (re.search(r'메모\s*(?:좀\s*)?(?:해\s*(?:줘|주세요|둬|놔)?|남겨)\s*$', text.strip(' .!?'))
           and not any(k in text for k in delete_kw + list_kw)):
+        intent = 'ADD_MEMO'
+    elif (re.search(r'(.+?)\s*메모\s*$', text.strip(' .!?'))
+          and not any(k in text for k in delete_kw + list_kw)
+          and not any(k in text for k in ['오늘', '어제', '내일', '최근', '마지막'])):
         intent = 'ADD_MEMO'
     elif any(k in text for k in add_kw) and not any(k in text for k in complete_kw + delete_kw + list_kw):
         intent = 'ADD_MEMO' if '메모' in text else 'ADD_TASK'
@@ -672,4 +689,4 @@ if __name__ == '__main__':
         ]
         for t in samples:
             print('\n명령:', t)
-            print(process_text(t))
+            print(process_text(t))

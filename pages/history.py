@@ -30,38 +30,7 @@ def normalize_datetime(dt_val):
 
 def init_history_state():
     if "history" not in st.session_state:
-        st.session_state.history = [
-            {
-                "created_at": datetime(2026, 10, 26, 14, 30),
-                "input_type": "직접 녹음",
-                "transcript": "내일 장보기 추가해 줘",
-                "intent": "ADD_TASK",
-                "status": "성공",
-                "response_text": "내일 할 일에 장보기를 추가했어요.",
-                "latency_ms": 2300,
-                "error_message": "",
-            },
-            {
-                "created_at": datetime(2026, 10, 26, 14, 25),
-                "input_type": "텍스트",
-                "transcript": "회의 준비라고 메모해 줘",
-                "intent": "ADD_MEMO",
-                "status": "성공",
-                "response_text": "회의 준비를 메모로 저장했어요.",
-                "latency_ms": 450,
-                "error_message": "",
-            },
-            {
-                "created_at": datetime(2026, 10, 26, 14, 20),
-                "input_type": "파일 업로드",
-                "transcript": "오늘 할 일 알려줘",
-                "intent": "LIST_TASK",
-                "status": "실패",
-                "response_text": "잠시 후 다시 시도해 주세요.",
-                "latency_ms": 1800,
-                "error_message": "DB 연결에 실패했습니다.",
-            },
-        ]
+        st.session_state.history = []
 
 
 STATUS_KO = {
