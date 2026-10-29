@@ -35,7 +35,7 @@ DATE_PATTERN = re.compile(
     r'\d{1,2}월\s*\d{1,2}일|'
     r'(?:이번\s*주|다음\s*주|지난\s*주)\s*[월화수목금토일]요일|'
     r'(?<![\d월])\d{1,2}일(?!\s*(?:간|동안|마다|째|연속|치))|'   # [수정] '29일', '30일' 처럼 일(日)만 말한 경우
-    r'오늘|내일|모레|어제|그저께|방금'
+    r'내일\s*모[레래]|오늘|내일|모레|어제|그저께|방금'
 )
 # [수정] 메모 내용 추출에는 기존 날짜 패턴만 사용 ('1일 1커밋 하기 메모해' 같은 내용이 잘리지 않도록)
 DATE_PATTERN_LEGACY = re.compile(
@@ -44,7 +44,7 @@ DATE_PATTERN_LEGACY = re.compile(
     r'(?:다음\s*달|이번\s*달)\s*\d{1,2}일|'
     r'\d{1,2}월\s*\d{1,2}일|'
     r'(?:이번\s*주|다음\s*주|지난\s*주)\s*[월화수목금토일]요일|'
-    r'오늘|내일|모레|어제|그저께|방금'
+    r'내일\s*모[레래]|오늘|내일|모레|어제|그저께|방금'
 )
 
 # [수정] STT가 날짜를 한글 숫자로 전사한 경우("이십구일") 아라비아 숫자로 정규화
@@ -66,7 +66,7 @@ def convert_date(date_text, today=None):
     today = today or date.today()
     s = re.sub(r'\s+', '', date_text)
     offsets = {'그저께': -2, '어제': -1, '오늘': 0,
-               '방금': 0, '내일': 1, '모레': 2}
+               '방금': 0, '내일': 1, '모레': 2, '내일모레': 2, '내일모래': 2}
     if s in offsets:
         return (today + timedelta(days=offsets[s])).isoformat()
 
@@ -132,6 +132,7 @@ def clean_title(value):
     value = re.sub(r'^(?:할\s*일(?:에|에서|중에|로|을|이)?|메모(?:에|장에)?)\s*', '', value)
     value = re.sub(r'^(?:에|를|을|은|는)\s+', '', value)
     value = re.sub(r'\s*(?:을|를|은|는|이|가|에|로|으로|까지)$', '', value)
+    value = re.sub(r'\s+(?:날짜|마감일|기한)$', '', value)
     value = re.sub(r'\s*(?:추가\s*(?:해줘|해달라|해주세요|해라|해|해주|하기|할래|좀)?|등록\s*(?:해줘|해달라|해주세요|해라|해|해주|하기|할래|좀)?|넣어\s*(?:줘|주세요|달라|라)?|추가|등록).*$', '', value)
     value = re.sub(r'^(?:추가|등록|할\s*일)\s*', '', value)
     return value.strip(' ,，.!?')
@@ -196,6 +197,8 @@ def extract_slots(text, intent):
 
     if intent in {'LIST_MEMO', 'DELETE_MEMO'}:
         m = re.search(r'^(.+?)\s*(?:관련|들어간)?\s*메모', working)
+        if not m:
+            m = re.search(r'메모(?:에서|장(?:에서)?)?\s*(.+?)\s*(?:관련|들어간)?\s*(?:목록|내용)?\s*(?:삭제|지워|보여|알려|조회)', working)
         if m:
             keyword = clean_title(m.group(1))
             keyword = re.sub(r'^(?:최근|마지막|방금)\s*(?:에)?\s*(?:쓴|적은|작성한|저장한)?\s*', '', keyword).strip()
@@ -305,16 +308,22 @@ def predict_intent(text):
         score_type = 'decision_score'
 
     # 명확한 의도 키워드 기반 오분류 보정 (하이브리드 NLU)
+    help_kw = ['도움말', '명령어', '사용법', '어떻게 써', '어떻게 사용', '기능 알려줘', '사용할 수 있는 명령']
     add_kw = ['추가', '등록', '넣어']
-    complete_kw = ['완료', '다 했어', '끝났어', '끝냈어']
-    delete_kw = ['삭제', '지워', '빼줘', '빼']
-    list_kw = ['목록', '보여줘', '알려줘', '조회', '뭐 있어', '확인']
-    update_kw = ['바꿔', '변경', '수정', '옮겨', '미뤄', '고쳐']  # [수정] '31일로 바꿔' 등 숫자 날짜 수정 명령 오분류 보정
+    complete_kw = ['다 했어', '끝났어', '끝냈어']
+    has_complete = any(k in text for k in complete_kw) or bool(re.search(r'(?<!미)완료', text))
+    delete_kw = ['삭제', '지워', '빼줘', '빼', '취소해줘', '취소']
+    list_kw = ['목록', '보여줘', '알려줘', '조회', '뭐 있어', '확인', '리스트']
+    update_kw = ['바꿔', '변경', '수정', '옮겨', '미뤄', '고쳐']
 
-    # [수정] '~라고 메모해/적어줘'는 내용에 '확인·삭제' 같은 단어가 있어도 메모 추가로 처리
-    #        '우유 사기 메모 해줘'처럼 띄어 쓴 경우도 메모 추가 (기존엔 메모 조회로 오분류)
-    quote = re.search(r'라고\s*(?:메모|적어|써|남겨)', text)
-    if quote and not any(k in text[quote.end():] for k in delete_kw + list_kw + ['둔', '놓은', '놨던', '있는']):
+    # 0) 도움말 우선 보정
+    if any(k in text for k in help_kw):
+        intent = 'HELP'
+    # 1) 조회 의도 우선 보정 ('미완료 할 일 보여줘', '완료한 할 일 알려줘' 등)
+    elif any(k in text for k in list_kw) and not any(k in text for k in add_kw + delete_kw + update_kw):
+        intent = 'LIST_MEMO' if '메모' in text else 'LIST_TASK'
+    # 2) 메모 전용 규칙
+    elif re.search(r'라고\s*(?:메모|적어|써|남겨)', text) and not any(k in text for k in delete_kw + list_kw):
         intent = 'ADD_MEMO'
     elif (re.search(r'메모\s*(?:좀\s*)?(?:해\s*(?:줘|주세요|둬|놔)?|남겨)\s*$', text.strip(' .!?'))
           and not any(k in text for k in delete_kw + list_kw)):
@@ -323,17 +332,15 @@ def predict_intent(text):
           and not any(k in text for k in delete_kw + list_kw)
           and not any(k in text for k in ['오늘', '어제', '내일', '최근', '마지막'])):
         intent = 'ADD_MEMO'
-    elif any(k in text for k in add_kw) and not any(k in text for k in complete_kw + delete_kw + list_kw):
+    elif any(k in text for k in add_kw) and not (has_complete or any(k in text for k in delete_kw + list_kw)):
         intent = 'ADD_MEMO' if '메모' in text else 'ADD_TASK'
-    elif any(k in text for k in complete_kw) and not any(k in text for k in add_kw + delete_kw):
+    elif has_complete and not any(k in text for k in add_kw + delete_kw + list_kw):
         intent = 'COMPLETE_TASK'
-    elif any(k in text for k in delete_kw) and not any(k in text for k in add_kw + complete_kw):
+    elif any(k in text for k in delete_kw) and not (has_complete or any(k in text for k in add_kw)):
         intent = 'DELETE_MEMO' if '메모' in text else 'DELETE_TASK'
     elif (any(k in text for k in update_kw) and '메모' not in text
-          and not any(k in text for k in add_kw + complete_kw + delete_kw + list_kw)):
+          and not (has_complete or any(k in text for k in add_kw + delete_kw + list_kw))):
         intent = 'UPDATE_TASK'
-    elif any(k in text for k in list_kw) and not any(k in text for k in add_kw + complete_kw + delete_kw):
-        intent = 'LIST_MEMO' if '메모' in text else 'LIST_TASK'
 
     # [수정] 한글 숫자 날짜 정규화('이십구일'→'29일')는 슬롯 추출에만 적용
     #        (모델 입력은 원문 그대로, 메모 내용은 사용자가 말한 그대로 저장)
